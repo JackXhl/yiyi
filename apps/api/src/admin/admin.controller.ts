@@ -1,16 +1,31 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UnauthorizedException } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UnauthorizedException,
+} from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
+import { createHash, randomBytes } from "node:crypto";
 import { JwtService } from "@nestjs/jwt";
 import { PERMISSIONS } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
 import { AdminOnly, Public } from "../auth/public.js";
 
+type AdminReq = { user: { sub: string; email: string } };
+
 @AdminOnly()
 @Controller("admin")
 export class AdminController {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(JwtService) private readonly jwt: JwtService,
   ) {}
 
   @Public()
@@ -26,7 +41,7 @@ export class AdminController {
   }
 
   @Get("me")
-  async me(@Req() req: { user: { sub: string; email: string } }) {
+  async me(@Req() req: AdminReq) {
     return { id: req.user.sub, email: req.user.email, permissions: await this.permsOf(req.user.sub) };
   }
 
@@ -59,6 +74,7 @@ export class AdminController {
         id: u.id,
         email: u.email,
         disabled: u.disabled,
+        planId: u.planId,
         planName: u.plan?.name ?? "—",
         articles: u._count.articles,
         subExpiresAt: u.subExpiresAt,
@@ -67,14 +83,16 @@ export class AdminController {
   }
 
   @Post("users/:id/disable")
-  async disable(@Req() req: { user: { email: string } }, @Param("id") id: string, @Body() body: { disabled: boolean }) {
+  async disable(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { disabled: boolean }) {
+    await this.assertPerm(req.user.sub, "user:disable");
     await this.prisma.user.update({ where: { id }, data: { disabled: body.disabled } });
     await this.log(req.user.email, "user:disable", id);
     return { ok: true };
   }
 
   @Post("users/:id/reset-password")
-  async reset(@Req() req: { user: { email: string } }, @Param("id") id: string, @Body() body: { password: string }) {
+  async reset(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { password: string }) {
+    await this.assertPerm(req.user.sub, "user:reset");
     await this.prisma.user.update({
       where: { id },
       data: { passwordHash: await bcrypt.hash(body.password, 10) },
@@ -84,7 +102,8 @@ export class AdminController {
   }
 
   @Post("users/:id/plan")
-  async setPlan(@Req() req: { user: { email: string } }, @Param("id") id: string, @Body() body: { planId: string }) {
+  async setPlan(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { planId: string }) {
+    await this.assertPerm(req.user.sub, "user:plan");
     await this.prisma.user.update({ where: { id }, data: { planId: body.planId } });
     await this.log(req.user.email, "user:plan", id);
     return { ok: true };
@@ -113,7 +132,12 @@ export class AdminController {
   }
 
   @Patch("plans/:id")
-  async patchPlan(@Body() body: { name?: string; monthlyQuota?: number; priceFen?: number; enabled?: boolean }, @Param("id") id: string) {
+  async patchPlan(
+    @Req() req: AdminReq,
+    @Body() body: { name?: string; monthlyQuota?: number; priceFen?: number; enabled?: boolean },
+    @Param("id") id: string,
+  ) {
+    await this.assertPerm(req.user.sub, "plan:edit");
     return this.prisma.plan.update({ where: { id }, data: body });
   }
 
@@ -127,7 +151,8 @@ export class AdminController {
   }
 
   @Post("orders/:id/refund-mark")
-  async refund(@Req() req: { user: { email: string } }, @Param("id") id: string) {
+  async refund(@Req() req: AdminReq, @Param("id") id: string) {
+    await this.assertPerm(req.user.sub, "order:refund");
     const order = await this.prisma.order.update({ where: { id }, data: { status: "refunded" } });
     await this.prisma.user.update({
       where: { id: order.userId },
@@ -143,7 +168,8 @@ export class AdminController {
   }
 
   @Post("jobs/:id/retry")
-  async retry(@Param("id") id: string) {
+  async retry(@Req() req: AdminReq, @Param("id") id: string) {
+    await this.assertPerm(req.user.sub, "job:retry");
     return this.prisma.generationJob.update({ where: { id }, data: { status: "queued" } });
   }
 
@@ -153,7 +179,12 @@ export class AdminController {
   }
 
   @Patch("topic-options/:id")
-  patchTopic(@Param("id") id: string, @Body() body: { labelZh?: string; enabled?: boolean; sort?: number }) {
+  async patchTopic(
+    @Req() req: AdminReq,
+    @Param("id") id: string,
+    @Body() body: { labelZh?: string; enabled?: boolean; sort?: number },
+  ) {
+    await this.assertPerm(req.user.sub, "topic:edit");
     return this.prisma.topicOption.update({ where: { id }, data: body });
   }
 
@@ -164,10 +195,12 @@ export class AdminController {
   }
 
   @Patch("slots/:slot")
-  patchSlot(
+  async patchSlot(
+    @Req() req: AdminReq,
     @Param("slot") slot: string,
     @Body() body: { baseUrl?: string; model?: string; apiKey?: string },
   ) {
+    await this.assertPerm(req.user.sub, "slot:edit");
     return this.prisma.capabilitySlot.upsert({
       where: { slot },
       update: body,
@@ -180,23 +213,43 @@ export class AdminController {
     return this.prisma.promptTemplate.findMany();
   }
 
+  @Patch("prompts/:id")
+  async patchPrompt(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { body?: string }) {
+    await this.assertPerm(req.user.sub, "prompt:edit");
+    return this.prisma.promptTemplate.update({
+      where: { id },
+      data: { ...(body.body != null ? { body: body.body, version: { increment: 1 } } : {}) },
+    });
+  }
+
   @Get("skills")
   skills() {
     return this.prisma.skill.findMany();
   }
 
   @Post("skills")
-  createSkill(@Body() body: { name: string; markdown: string }) {
+  async createSkill(@Req() req: AdminReq, @Body() body: { name: string; markdown: string }) {
+    await this.assertPerm(req.user.sub, "skill:import");
     if (/过检测|降AI|去AI痕迹/.test(body.markdown + body.name)) {
-      throw new Error("禁止导入降 AI 检测类技能");
+      throw new ForbiddenException("禁止导入降 AI 检测类技能");
     }
     return this.prisma.skill.create({
-      data: { name: body.name, markdown: body.markdown.replace(/```[\s\S]*?```/g, "").slice(0, 20000), reviewed: false, enabled: false },
+      data: {
+        name: body.name,
+        markdown: body.markdown.replace(/```[\s\S]*?```/g, "").slice(0, 20000),
+        reviewed: false,
+        enabled: false,
+      },
     });
   }
 
   @Patch("skills/:id")
-  patchSkill(@Param("id") id: string, @Body() body: { enabled?: boolean; reviewed?: boolean }) {
+  async patchSkill(
+    @Req() req: AdminReq,
+    @Param("id") id: string,
+    @Body() body: { enabled?: boolean; reviewed?: boolean },
+  ) {
+    await this.assertPerm(req.user.sub, "skill:edit");
     return this.prisma.skill.update({ where: { id }, data: body });
   }
 
@@ -205,22 +258,67 @@ export class AdminController {
     return this.prisma.stylePreset.findMany();
   }
 
+  @Patch("styles/:id")
+  async patchStyle(
+    @Req() req: AdminReq,
+    @Param("id") id: string,
+    @Body() body: { enabled?: boolean; labelZh?: string },
+  ) {
+    await this.assertPerm(req.user.sub, "style:edit");
+    return this.prisma.stylePreset.update({ where: { id }, data: body });
+  }
+
   @Get("mcp-tokens")
   mcp() {
     return this.prisma.mcpToken.findMany();
   }
 
+  @Post("mcp-tokens")
+  async createMcp(@Req() req: AdminReq, @Body() body: { label: string }) {
+    await this.assertPerm(req.user.sub, "mcp:edit");
+    const raw = randomBytes(24).toString("hex");
+    const tokenHash = createHash("sha256").update(raw).digest("hex");
+    await this.prisma.mcpToken.create({
+      data: {
+        label: body.label || "default",
+        tokenHash,
+        tools: ["upsert_article", "add_anchor", "trigger_generate", "read_article"],
+      },
+    });
+    return { token: raw, note: "只显示一次，无 publish" };
+  }
+
+  @Post("mcp-tokens/:id/revoke")
+  async revokeMcp(@Req() req: AdminReq, @Param("id") id: string) {
+    await this.assertPerm(req.user.sub, "mcp:edit");
+    return this.prisma.mcpToken.update({ where: { id }, data: { enabled: false } });
+  }
+
   @Get("roles")
-  async roles() {
-    const roles = await this.prisma.role.findMany({ include: { permissions: { include: { permission: true } } } });
-    return {
-      permissions: PERMISSIONS,
-      roles: roles.map((r) => ({
-        id: r.id,
-        name: r.name,
-        permissions: r.permissions.map((p) => p.permission.code),
-      })),
-    };
+  roles() {
+    return this.rolesPayload();
+  }
+
+  @Post("roles")
+  async createRole(@Req() req: AdminReq, @Body() body: { name: string }) {
+    await this.assertPerm(req.user.sub, "role:edit");
+    await this.prisma.role.create({ data: { name: body.name } });
+    await this.log(req.user.email, "role:create", body.name);
+    return this.rolesPayload();
+  }
+
+  @Patch("roles/:id")
+  async patchRole(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { permissions?: string[] }) {
+    await this.assertPerm(req.user.sub, "role:edit");
+    if (body.permissions) {
+      await this.prisma.rolePermission.deleteMany({ where: { roleId: id } });
+      const perms = await this.prisma.permission.findMany({ where: { code: { in: body.permissions } } });
+      await this.prisma.rolePermission.createMany({
+        data: perms.map((p) => ({ roleId: id, permissionId: p.id })),
+      });
+    }
+    await this.log(req.user.email, "role:edit", id);
+    return this.rolesPayload();
   }
 
   @Get("admins")
@@ -238,6 +336,23 @@ export class AdminController {
   @Get("site")
   site() {
     return this.prisma.siteConfig.findUnique({ where: { id: "default" } });
+  }
+
+  private async rolesPayload() {
+    const roles = await this.prisma.role.findMany({ include: { permissions: { include: { permission: true } } } });
+    return {
+      permissions: PERMISSIONS,
+      roles: roles.map((r) => ({
+        id: r.id,
+        name: r.name,
+        permissions: r.permissions.map((p) => p.permission.code),
+      })),
+    };
+  }
+
+  private async assertPerm(adminId: string, code: string) {
+    const perms = await this.permsOf(adminId);
+    if (!perms.includes(code)) throw new ForbiddenException("没有权限");
   }
 
   private async permsOf(adminId: string) {

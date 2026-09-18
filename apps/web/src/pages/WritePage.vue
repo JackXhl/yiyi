@@ -37,8 +37,8 @@
         <t-textarea v-model="a.text" :autosize="{ minRows: 2 }" placeholder="写你自己碰到的具体事" @change="a.confirmed = a.text.trim().length >= 4" />
       </div>
       <p class="hint">风格默认系统，可不改。</p>
-      <t-button theme="primary" :disabled="!!article.generateBlocked" @click="save(); node = 'media'">下一步</t-button>
-      <p class="err" v-if="article.generateBlocked">{{ article.generateBlocked }}</p>
+      <t-button theme="primary" :disabled="!!gateReason" @click="save(); node = 'media'">下一步</t-button>
+      <p class="err" v-if="gateReason">{{ gateReason }}</p>
     </section>
 
     <section v-show="node === 'media'">
@@ -49,16 +49,18 @@
       <div class="thumbs">
         <div class="card-asset" v-for="as in article.assets" :key="as.id">
           <img v-if="as.kind === 'image'" :src="as.url" alt="" />
+          <div v-else class="ph">短视频</div>
           <p class="hint">{{ as.analysis?.caption }}</p>
           <t-button size="small" theme="primary" variant="outline" @click="confirmAsset(as.id)">用这条当锚点</t-button>
         </div>
       </div>
       <p style="margin-top: 16px">
         <t-button variant="outline" @click="node = 'topic'">上一步</t-button>
-        <t-button theme="primary" style="margin-left: 8px" :disabled="!!article.generateBlocked" @click="run">按这个写</t-button>
+        <t-button theme="primary" style="margin-left: 8px" :disabled="!!gateReason" @click="run">按这个写</t-button>
       </p>
-      <p class="err" v-if="article.generateBlocked">{{ article.generateBlocked }}</p>
+      <p class="err" v-if="gateReason">{{ gateReason }}</p>
       <p class="hint" v-if="article.status === 'generating'">正在写大纲</p>
+      <div class="progress" v-if="article.status === 'generating'" />
     </section>
 
     <section v-show="node === 'outline'" class="split">
@@ -79,18 +81,32 @@
       </div>
       <div>
         <div class="chips">
+          <button type="button" class="chip" :class="{ on: preview === 'desk' }" @click="preview = 'desk'">电脑宽</button>
           <button type="button" class="chip" :class="{ on: preview === 'mp' }" @click="preview = 'mp'">公众号宽</button>
           <button type="button" class="chip" :class="{ on: preview === 'note' }" @click="preview = 'note'">笔记宽</button>
         </div>
-        <div class="preview" :class="preview" v-html="preview === 'mp' ? article.bodyLong : noteHtml" />
+        <div class="preview" :class="preview" v-html="preview === 'note' ? noteHtml : article.bodyLong" />
+        <p style="margin-top: 16px">
+          <t-button theme="primary" @click="save(); node = 'adapt'">去适配</t-button>
+        </p>
       </div>
     </section>
 
     <section v-show="node === 'adapt'">
       <label>笔记文案</label>
       <t-textarea v-model="article.bodyNote" :autosize="{ minRows: 8 }" />
-      <p class="hint">小红书按上传顺序传图。不代发。</p>
-      <t-button theme="primary" @click="save(); node = 'check'">去检查</t-button>
+      <p class="hint">小红书按这个顺序传图。不代发。可上移、拿掉某张。</p>
+      <div class="thumbs">
+        <div class="card-asset" v-for="(as, i) in imageAssets" :key="as.id">
+          <img :src="as.url" alt="" />
+          <p class="hint">第 {{ i + 1 }} 张{{ i === 0 ? " · 封面" : "" }}</p>
+          <p>
+            <t-button size="small" variant="outline" :disabled="i === 0" @click="moveAsset(i, -1)">上移</t-button>
+            <t-button size="small" variant="outline" @click="dropAsset(as.id)">拿掉</t-button>
+          </p>
+        </div>
+      </div>
+      <t-button theme="primary" style="margin-top: 16px" @click="save(); node = 'check'">去检查</t-button>
     </section>
 
     <section v-show="node === 'check' || node === 'copy'">
@@ -111,6 +127,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { canGenerate } from "@yiyi/shared";
 import { api } from "../api";
 
 const steps = [
@@ -140,6 +157,7 @@ type Article = {
   highRiskAck: boolean;
   checkReport: { level: string; text: string }[];
   assets: { id: string; kind: string; url: string; analysis?: { caption?: string } }[];
+  layout?: { long?: { coverId?: string | null }; note?: { order?: string[] } };
 };
 
 const route = useRoute();
@@ -152,8 +170,24 @@ const options = ref<{ form: Opt[]; intent: Opt[]; topicL1: Opt[]; topicMore: Opt
   topicMore: [],
 });
 const node = ref("topic");
-const preview = ref<"mp" | "note">("mp");
+const preview = ref<"desk" | "mp" | "note">("mp");
 const copyErr = ref("");
+
+const gateReason = computed(() => {
+  const a = article.value;
+  if (!a) return "";
+  const local = canGenerate({
+    anchors: a.anchors.map((x) => ({
+      ...x,
+      confirmed: x.confirmed || x.text.trim().length >= 4,
+    })),
+    quotaLeft: 99,
+    subActive: true,
+  });
+  if (!local.ok) return local.reason ?? "";
+  if (a.generateBlocked && /到期|篇数/.test(a.generateBlocked)) return a.generateBlocked;
+  return "";
+});
 
 const report = computed(() => article.value?.checkReport ?? []);
 const highRisk = computed(
@@ -165,11 +199,18 @@ const canCopyNow = computed(() => {
   return true;
 });
 const noteHtml = computed(() => (article.value?.bodyNote || "").replace(/\n/g, "<br/>"));
+const imageAssets = computed(() => {
+  const all = (article.value?.assets || []).filter((a) => a.kind === "image");
+  const order = article.value?.layout?.note?.order;
+  if (!order?.length) return all;
+  const byId = new Map(all.map((a) => [a.id, a]));
+  return order.map((id) => byId.get(id)).filter((a): a is (typeof all)[number] => !!a);
+});
 
 onMounted(async () => {
   options.value = await api("/api/topic-options");
   if (!route.params.id) {
-    const created = await api<{ id: string }>("/api/articles", { method: "POST" });
+    const created = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
     await router.replace(`/write/${created.id}`);
   }
   await load();
@@ -205,6 +246,7 @@ async function save() {
       outline: article.value.outline,
       bodyLong: article.value.bodyLong,
       bodyNote: article.value.bodyNote,
+      layout: article.value.layout,
       currentNode: node.value,
       disclosureAck: article.value.disclosureAck,
       highRiskAck: article.value.highRiskAck,
@@ -237,6 +279,33 @@ async function confirmAsset(id: string) {
   await api(`/api/articles/${article.value.id}/assets/${id}/confirm`, {
     method: "POST",
     body: JSON.stringify({ asAnchor: true }),
+  });
+  await load();
+}
+
+async function dropAsset(id: string) {
+  if (!article.value) return;
+  const order = imageAssets.value.map((a) => a.id).filter((x) => x !== id);
+  article.value.layout = {
+    ...(article.value.layout || {}),
+    long: { coverId: order[0] ?? null },
+    note: { order },
+  };
+  await save();
+}
+
+async function moveAsset(index: number, dir: number) {
+  if (!article.value) return;
+  const imgs = imageAssets.value;
+  const next = index + dir;
+  if (next < 0 || next >= imgs.length) return;
+  const ids = imgs.map((a) => a.id);
+  const t = ids[index];
+  ids[index] = ids[next];
+  ids[next] = t;
+  await api(`/api/articles/${article.value.id}/assets/reorder`, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
   });
   await load();
 }

@@ -36,7 +36,7 @@ onMounted(async () => {
 });
 
 async function create() {
-  const a = await api<{ id: string }>("/api/articles", { method: "POST" });
+  const a = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
   router.push(`/write/${a.id}`);
 }
 

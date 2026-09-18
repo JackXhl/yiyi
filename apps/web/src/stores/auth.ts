@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { api, clearToken, setToken, token } from "./api";
+import { api, clearToken, setToken, token } from "../api";
 
 export const useAuth = defineStore("auth", () => {
   const email = ref("");

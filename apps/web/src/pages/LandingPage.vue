@@ -7,7 +7,23 @@
         <router-link to="/register"><t-button theme="primary">开始写稿</t-button></router-link>
         <router-link to="/login" style="margin-left: 16px">登录</router-link>
       </p>
-      <p class="hint">月付 / 年付一次结清。过期后只能看已有稿，不能再生成。</p>
+      <div v-for="p in plans" :key="p.id" style="padding: 8px 0; border-bottom: 1px solid #e7e7e7">
+        {{ p.name }}　{{ p.priceYuan === "0" ? "免费体验" : p.priceYuan + " 元" }}　{{ p.monthlyQuota }} 篇 / 月
+      </div>
+      <p class="hint" style="margin-top: 16px">月付 / 年付一次结清。过期后只能看已有稿，不能再生成。</p>
     </div>
   </div>
 </template>
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import { api } from "../api";
+
+const plans = ref<{ id: string; name: string; monthlyQuota: number; priceYuan: string }[]>([]);
+onMounted(async () => {
+  try {
+    plans.value = (await api<{ items: typeof plans.value }>("/api/billing/plans")).items;
+  } catch {
+    plans.value = [];
+  }
+});
+</script>

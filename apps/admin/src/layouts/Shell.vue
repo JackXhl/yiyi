@@ -11,7 +11,10 @@
         <el-menu-item index="/jobs">生成任务</el-menu-item>
         <el-menu-item index="/topics">选题选项</el-menu-item>
         <el-menu-item index="/slots">能力槽</el-menu-item>
+        <el-menu-item index="/prompts">提示词</el-menu-item>
         <el-menu-item index="/skills">技能</el-menu-item>
+        <el-menu-item index="/styles">写作风格</el-menu-item>
+        <el-menu-item index="/mcp">MCP 接入</el-menu-item>
         <el-menu-item index="/roles">角色权限</el-menu-item>
         <el-menu-item index="/audit">操作日志</el-menu-item>
       </el-menu>

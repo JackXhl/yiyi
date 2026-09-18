@@ -9,6 +9,7 @@ import {
   Post,
   Query,
   Req,
+  Inject,
 } from "@nestjs/common";
 import { ARTICLE_STATUS_LABEL, Anchor, canCopy, canGenerate } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
@@ -21,8 +22,8 @@ function statusLabel(status: string) {
 @Controller("articles")
 export class ArticlesController {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly generate: GenerateService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(GenerateService) private readonly generate: GenerateService,
   ) {}
 
   @Get()
@@ -82,6 +83,7 @@ export class ArticlesController {
       bodyNote?: string;
       currentNode?: string;
       styleCode?: string;
+      layout?: unknown;
       disclosureAck?: boolean;
       highRiskAck?: boolean;
     },
@@ -101,6 +103,7 @@ export class ArticlesController {
         ...(body.bodyNote != null ? { bodyNote: body.bodyNote } : {}),
         ...(body.currentNode != null ? { currentNode: body.currentNode } : {}),
         ...(body.styleCode != null ? { styleCode: body.styleCode } : {}),
+        ...(body.layout != null ? { layout: body.layout } : {}),
         ...(body.disclosureAck != null ? { disclosureAck: body.disclosureAck } : {}),
         ...(body.highRiskAck != null ? { highRiskAck: body.highRiskAck } : {}),
       },
@@ -128,9 +131,16 @@ export class ArticlesController {
       highRiskAck: article.highRiskAck,
     });
     if (!gate.ok) throw new ForbiddenException(gate.reason);
+    const assets = await this.prisma.asset.findMany({
+      where: { articleId: id },
+      orderBy: { sort: "asc" },
+    });
     return {
       longHtml: article.bodyLong,
       noteText: article.bodyNote,
+      images: assets
+        .filter((a) => a.kind === "image")
+        .map((a, i) => ({ n: i + 1, url: `/uploads/${a.path}`, cover: i === 0 })),
       backends: [
         { name: "微信公众平台", url: "https://mp.weixin.qq.com/" },
         { name: "小红书创作中心", url: "https://creator.xiaohongshu.com/" },

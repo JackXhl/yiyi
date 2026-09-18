@@ -200,8 +200,16 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   padding: 16px;
   min-height: 320px;
 }
+.preview.desk { max-width: 960px; }
 .preview.mp { max-width: 677px; }
 .preview.note { max-width: 360px; }
+.preview img { max-width: 100%; height: auto; display: block; margin: 8px 0; }
+.progress {
+  height: 2px;
+  background: var(--yy-green);
+  width: 40%;
+  margin-top: 8px;
+}
 
 .upload {
   border: 1px dashed var(--yy-line);

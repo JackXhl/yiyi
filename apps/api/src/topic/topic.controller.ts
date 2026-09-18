@@ -1,10 +1,10 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Inject } from "@nestjs/common";
 import { Public } from "../auth/public.js";
 import { PrismaService } from "../prisma.service.js";
 
 @Controller("topic-options")
 export class TopicController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   @Public()
   @Get()

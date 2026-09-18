@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Req } from "@nestjs/common";
 import { PrismaService } from "../prisma.service.js";
+import { Public } from "../auth/public.js";
 
 @Controller("billing")
 export class BillingController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
+  @Public()
   @Get("plans")
   async plans() {
     const plans = await this.prisma.plan.findMany({ where: { enabled: true }, orderBy: { priceFen: "asc" } });
@@ -32,13 +34,20 @@ export class BillingController {
         mock: process.env.WECHAT_PAY_MOCK !== "false",
       },
     });
+    const mock = order.mock;
     return {
       orderId: order.id,
-      mock: order.mock,
+      mock,
       amountFen: order.amountFen,
-      hint: order.mock
+      hint: mock
         ? "未配置微信商户时走本地确认支付（第一期演示）。配好 WECHAT_MCHID 后走 Native 下单。"
         : "请用微信扫码支付",
+      native: mock
+        ? null
+        : {
+            mchid: process.env.WECHAT_MCHID,
+            note: "商户已配置：此处应返回 Native code_url，第一期未接真下单则仍走 mock-pay。",
+          },
     };
   }
 

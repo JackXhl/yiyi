@@ -12,10 +12,12 @@ import { LlmService } from "./generate/llm.service.js";
 import { BillingController } from "./billing/billing.controller.js";
 import { AdminController } from "./admin/admin.controller.js";
 import { TopicController } from "./topic/topic.controller.js";
+import { McpController } from "./mcp/mcp.controller.js";
 
 @Module({
   imports: [
     JwtModule.register({
+      global: true,
       secret: process.env.JWT_SECRET || "dev-only-change-me",
       signOptions: { expiresIn: "7d" },
     }),
@@ -27,6 +29,7 @@ import { TopicController } from "./topic/topic.controller.js";
     BillingController,
     AdminController,
     TopicController,
+    McpController,
   ],
   providers: [
     PrismaService,

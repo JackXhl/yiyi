@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Post, Req } from "@nestjs/common";
 import { AuthService } from "./auth.service.js";
 import { Public } from "./public.js";
 import { PrismaService } from "../prisma.service.js";
@@ -6,8 +6,8 @@ import { PrismaService } from "../prisma.service.js";
 @Controller()
 export class AuthController {
   constructor(
-    private readonly auth: AuthService,
-    private readonly prisma: PrismaService,
+    @Inject(AuthService) private readonly auth: AuthService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   @Public()
