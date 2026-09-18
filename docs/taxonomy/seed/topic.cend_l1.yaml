@@ -1,0 +1,32 @@
+# C 端第一屏生活向。code 稳定。maps 挂 IAB / IPTC / 国标对照。
+items:
+  - { code: topic.food, label_zh: 吃的, cend_l1: true, iab: Food & Drink }
+  - { code: topic.outing, label_zh: 出门玩, cend_l1: true, iab: Travel }
+  - { code: topic.kids, label_zh: 带孩子, cend_l1: true, iab: Family and Relationships }
+  - { code: topic.work, label_zh: 上班, cend_l1: true, iab: Careers }
+  - { code: topic.shopping, label_zh: 买东西, cend_l1: true, iab: Shopping }
+  - { code: topic.fashion, label_zh: 化妆穿搭, cend_l1: true, iab: Style & Fashion }
+  - { code: topic.tech, label_zh: 手机电脑, cend_l1: true, iab: Technology & Computing }
+  - { code: topic.local, label_zh: 在本地, cend_l1: true, iab: Attractions }
+  - { code: topic.fitness, label_zh: 健身运动, cend_l1: true, iab: Sports }
+  - { code: topic.home, label_zh: 家里装修, cend_l1: true, iab: Home & Garden }
+  - { code: topic.study, label_zh: 学习考试, cend_l1: true, iab: Education }
+  - { code: topic.pets, label_zh: 养宠物, cend_l1: true, iab: Pets }
+  - { code: topic.car, label_zh: 车, cend_l1: true, iab: Automotive }
+  - { code: topic.house, label_zh: 房子, cend_l1: true, iab: Real Estate }
+  - { code: topic.media, label_zh: 读书影视, cend_l1: true, iab: Books and Literature }
+  - { code: topic.game, label_zh: 游戏动漫, cend_l1: true, iab: Video Gaming }
+  - { code: topic.star, label_zh: 追星娱乐, cend_l1: true, iab: Pop Culture }
+  - { code: topic.biz, label_zh: 公司生意, cend_l1: true, iab: Business and Finance }
+  - { code: topic.hobby, label_zh: 兴趣爱好, cend_l1: true, iab: Hobbies & Interests }
+  - { code: topic.festival, label_zh: 过节办事, cend_l1: true, iab: Personal Celebrations & Life Events }
+  - { code: topic.science, label_zh: 科学, cend_l1: true, iab: Science }
+  - { code: topic.other, label_zh: 其他, cend_l1: true }
+more:
+  - { code: topic.health, label_zh: 看病健康, risk: medical, iab: Medical Health }
+  - { code: topic.finance, label_zh: 理财, risk: finance, iab: Personal Finance }
+  - { code: topic.politics, label_zh: 时政, risk: politics, iab: Politics }
+  - { code: topic.law, label_zh: 法律, risk: law, iab: Law }
+  - { code: topic.faith, label_zh: 信仰, risk: scd, iab: Religion & Spirituality }
+  - { code: topic.env, label_zh: 环境, iab: Disasters }
+  - { code: topic.weather, label_zh: 天气, iptc: "17000000" }

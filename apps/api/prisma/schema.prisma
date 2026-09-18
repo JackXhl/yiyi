@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String
+  disabled       Boolean   @default(false)
+  planId         String?
+  plan           Plan?     @relation(fields: [planId], references: [id])
+  quotaUsed      Int       @default(0)
+  quotaResetAt   DateTime  @default(now())
+  subExpiresAt   DateTime?
+  createdAt      DateTime  @default(now())
+  articles       Article[]
+  orders         Order[]
+}
+
+model Article {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  title          String   @default("")
+  theme          String   @default("")
+  formCode       String   @default("form.both")
+  intentCode     String   @default("intent.story")
+  topicCodes     String[] @default([])
+  anchors        Json     @default("[]")
+  status         String   @default("draft")
+  currentNode    String   @default("topic")
+  outline        String   @default("")
+  bodyLong       String   @default("")
+  bodyNote       String   @default("")
+  layout         Json     @default("{}")
+  checkReport    Json     @default("[]")
+  disclosureAck  Boolean  @default(false)
+  highRiskAck    Boolean  @default(false)
+  styleCode      String   @default("system")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  assets         Asset[]
+  jobs           GenerationJob[]
+}
+
+model Asset {
+  id          String   @id @default(cuid())
+  articleId   String
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  kind        String
+  path        String
+  mime        String   @default("application/octet-stream")
+  analysis    Json?
+  confirmed   Boolean  @default(false)
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  disabled     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  roles        AdminRole[]
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  permissions RolePermission[]
+  admins      AdminRole[]
+}
+
+model Permission {
+  id    String           @id @default(cuid())
+  code  String           @unique
+  roles RolePermission[]
+}
+
+model AdminRole {
+  adminId String
+  roleId  String
+  admin   AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  role    Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  @@id([adminId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([roleId, permissionId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Plan {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  monthlyQuota Int
+  durationDays Int
+  priceFen     Int
+  enabled      Boolean  @default(true)
+  users        User[]
+  orders       Order[]
+}
+
+model Order {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  planId    String
+  plan      Plan      @relation(fields: [planId], references: [id])
+  amountFen Int
+  status    String    @default("pending")
+  mock      Boolean   @default(true)
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model TopicOption {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  labelZh   String
+  axis      String
+  parentId  String?
+  mapsJson  Json    @default("{}")
+  risk      String  @default("")
+  promptHint String @default("")
+  sort      Int     @default(0)
+  enabled   Boolean @default(true)
+  cendL1    Boolean @default(false)
+}
+
+model CapabilitySlot {
+  id      String @id @default(cuid())
+  slot    String @unique
+  baseUrl String @default("")
+  model   String @default("")
+  apiKey  String @default("")
+}
+
+model PromptTemplate {
+  id       String @id @default(cuid())
+  node     String
+  platform String @default("")
+  body     String
+  version  Int    @default(1)
+}
+
+model Skill {
+  id       String  @id @default(cuid())
+  name     String
+  markdown String
+  enabled  Boolean @default(false)
+  reviewed Boolean @default(false)
+  nodes    String[] @default([])
+}
+
+model StylePreset {
+  id      String  @id @default(cuid())
+  code    String  @unique
+  labelZh String
+  params  Json    @default("{}")
+  rights  String  @default("system")
+  enabled Boolean @default(true)
+}
+
+model McpToken {
+  id        String   @id @default(cuid())
+  label     String
+  tokenHash String   @unique
+  enabled   Boolean  @default(true)
+  tools     String[] @default([])
+  createdAt DateTime @default(now())
+}
+
+model GenerationJob {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  node      String
+  status    String
+  snapshot  Json     @default("{}")
+  createdAt DateTime @default(now())
+}
+
+model SiteConfig {
+  id    String @id @default("default")
+  json  Json   @default("{}")
+}

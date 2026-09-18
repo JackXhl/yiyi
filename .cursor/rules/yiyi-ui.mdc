@@ -1,0 +1,12 @@
+---
+description: C 端 UI 气质
+globs: apps/web/**/*.{vue,css}
+---
+
+# UI 质量
+
+气质对标微信公众号后台、掘金创作后台、小红书创作中心。细则见 docs/product/03-ui.md 与 docs/superpowers/specs/2026-09-16-yiyi-desk-design.md。
+
+必须：白底、1px #E7E7E7、4–6px 圆角、黑体、主按钮 #07C160、链接 #1E80FF、TDesign t-*、空态给下一步、中文状态文案。
+
+禁止：紫渐变、KPI 墙、Chat 对话墙、按钮写「发布/同步上线」。

@@ -1,0 +1,43 @@
+{
+  "name": "@yiyi/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "test": "vitest",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.12",
+    "@prisma/client": "^6.15.0",
+    "@yiyi/shared": "workspace:*",
+    "ai": "^5.0.0",
+    "@ai-sdk/openai": "^2.0.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "multer": "1.4.5-lts.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.1",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.13.10",
+    "prisma": "^6.15.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}

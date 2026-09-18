@@ -1,0 +1,13 @@
+- code: form.long
+  label_zh: 一篇能发公众号的长文
+  maps: { form: long_illustrated }
+  sort: 1
+- code: form.note
+  label_zh: 一组能发小红书的图
+  maps: { form: xhs_note }
+  sort: 2
+- code: form.both
+  label_zh: 两个都要
+  maps: { form: both }
+  sort: 3
+  default: true

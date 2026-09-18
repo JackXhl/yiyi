@@ -1,0 +1,18 @@
+- code: intent.story
+  label_zh: 把我经历过的事讲清楚
+  maps: { genre: narrative, intent: inform }
+  sort: 1
+  default: true
+- code: intent.howto
+  label_zh: 教别人一步一步做
+  maps: { genre: explainer, intent: inform }
+  sort: 2
+- code: intent.opinion
+  label_zh: 说说我的看法
+  maps: { genre: argument, intent: inform }
+  sort: 3
+- code: intent.promo
+  label_zh: 安利 / 种草
+  maps: { genre: review, intent: promote }
+  risk: advertising
+  sort: 4

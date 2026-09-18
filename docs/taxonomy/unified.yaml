@@ -1,0 +1,16 @@
+# 一意 code ↔ 源 ID（C 端文案用生活词，源 ID 全保留）
+# 领域并集以 IAB 3.1 aboutness + IPTC 顶级为主；微信类目只做 risk。
+topic:
+  topic.food: { iab_tier1: "Food & Drink", iptc: "10000000" }
+  topic.health: { iab_tier1: "Medical Health", iptc: "07000000", wechat_risk: 医疗服务 }
+  topic.finance: { iab_tier1: "Personal Finance", iptc: "04000000", wechat_risk: 金融业 }
+  topic.politics: { iab_tier1: "Politics", iptc: "11000000", wechat_risk: 时政信息 }
+  topic.tech: { iab_tier1: "Technology & Computing", juejin: true }
+form:
+  form.long: { gb_tc: TC07 }
+  form.note: { gb_tc: null }
+intent_genre:
+  intent.story: { gb_tc: TC07 }
+  intent.howto: { gb_tc: TC15 }
+  intent.opinion: { gb_tc: TC04 }
+  intent.promo: { gb_tc: TC34 }

@@ -1,0 +1,11 @@
+{
+  "name": "yiyi",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @yiyi/api --filter @yiyi/web --filter @yiyi/admin dev",
+    "test": "pnpm --filter @yiyi/shared test --run && pnpm --filter @yiyi/api test --run",
+    "db:migrate": "pnpm --filter @yiyi/api prisma:migrate",
+    "db:seed": "pnpm --filter @yiyi/api prisma:seed"
+  }
+}
