@@ -3,6 +3,7 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  HttpException,
   Inject,
   Param,
   Patch,
@@ -14,11 +15,13 @@ import {
 import * as bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { JwtService } from "@nestjs/jwt";
-import { PERMISSIONS } from "@yiyi/shared";
+import { credentialsSchema, hitLimiter, PERMISSIONS } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
+import { GenerateService } from "../generate/generate.service.js";
 import { AdminOnly, Public } from "../auth/public.js";
 
 type AdminReq = { user: { sub: string; email: string } };
+const adminHits = new Map<string, number[]>();
 
 @AdminOnly()
 @Controller("admin")
@@ -26,12 +29,17 @@ export class AdminController {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(JwtService) private readonly jwt: JwtService,
+    @Inject(GenerateService) private readonly generate: GenerateService,
   ) {}
 
   @Public()
   @Post("login")
-  async login(@Body() body: { email: string; password: string }) {
-    const admin = await this.prisma.adminUser.findUnique({ where: { email: body.email.toLowerCase() } });
+  async login(@Body() raw: unknown) {
+    const body = credentialsSchema.parse(raw);
+    if (!hitLimiter(adminHits, `admin:${body.email}`, 8, 60_000)) {
+      throw new HttpException("请稍后再试", 429);
+    }
+    const admin = await this.prisma.adminUser.findUnique({ where: { email: body.email } });
     if (!admin || admin.disabled || !(await bcrypt.compare(body.password, admin.passwordHash))) {
       throw new UnauthorizedException("邮箱或密码不对");
     }
@@ -46,7 +54,8 @@ export class AdminController {
   }
 
   @Get("overview")
-  async overview() {
+  async overview(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "overview:view");
     const [users, jobsFail, articles] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.generationJob.count({ where: { status: "failed" } }),
@@ -62,7 +71,8 @@ export class AdminController {
   }
 
   @Get("users")
-  async users(@Query("q") q?: string) {
+  async users(@Req() req: AdminReq, @Query("q") q?: string) {
+    await this.assertPerm(req.user.sub, "user:list");
     const items = await this.prisma.user.findMany({
       where: q ? { email: { contains: q, mode: "insensitive" } } : {},
       include: { plan: true, _count: { select: { articles: true } } },
@@ -93,9 +103,10 @@ export class AdminController {
   @Post("users/:id/reset-password")
   async reset(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { password: string }) {
     await this.assertPerm(req.user.sub, "user:reset");
+    const password = credentialsSchema.shape.password.parse(body.password);
     await this.prisma.user.update({
       where: { id },
-      data: { passwordHash: await bcrypt.hash(body.password, 10) },
+      data: { passwordHash: await bcrypt.hash(password, 10) },
     });
     await this.log(req.user.email, "user:reset", id);
     return { ok: true };
@@ -110,7 +121,8 @@ export class AdminController {
   }
 
   @Get("articles")
-  async articles() {
+  async articles(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "article:inspect");
     const items = await this.prisma.article.findMany({
       take: 50,
       orderBy: { updatedAt: "desc" },
@@ -127,7 +139,8 @@ export class AdminController {
   }
 
   @Get("plans")
-  plans() {
+  async plans(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "plan:edit");
     return this.prisma.plan.findMany({ orderBy: { priceFen: "asc" } });
   }
 
@@ -142,7 +155,8 @@ export class AdminController {
   }
 
   @Get("orders")
-  orders() {
+  async orders(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "order:list");
     return this.prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -163,18 +177,24 @@ export class AdminController {
   }
 
   @Get("jobs")
-  jobs() {
+  async jobs(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "job:retry");
     return this.prisma.generationJob.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
   }
 
   @Post("jobs/:id/retry")
   async retry(@Req() req: AdminReq, @Param("id") id: string) {
     await this.assertPerm(req.user.sub, "job:retry");
-    return this.prisma.generationJob.update({ where: { id }, data: { status: "queued" } });
+    const job = await this.prisma.generationJob.findUniqueOrThrow({ where: { id } });
+    const article = await this.prisma.article.findUniqueOrThrow({ where: { id: job.articleId } });
+    await this.generate.run(article.id, article.userId);
+    await this.prisma.generationJob.update({ where: { id }, data: { status: "done" } });
+    return { ok: true };
   }
 
   @Get("topic-options")
-  topicOptions() {
+  async topicOptions(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "topic:edit");
     return this.prisma.topicOption.findMany({ orderBy: [{ axis: "asc" }, { sort: "asc" }] });
   }
 
@@ -189,7 +209,8 @@ export class AdminController {
   }
 
   @Get("slots")
-  async slots() {
+  async slots(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "slot:edit");
     const rows = await this.prisma.capabilitySlot.findMany();
     return rows.map((s) => ({ ...s, apiKey: s.apiKey ? "已保存" : "" }));
   }
@@ -201,15 +222,17 @@ export class AdminController {
     @Body() body: { baseUrl?: string; model?: string; apiKey?: string },
   ) {
     await this.assertPerm(req.user.sub, "slot:edit");
-    return this.prisma.capabilitySlot.upsert({
+    const row = await this.prisma.capabilitySlot.upsert({
       where: { slot },
       update: body,
       create: { slot, ...body },
     });
+    return { ...row, apiKey: row.apiKey ? "已保存" : "" };
   }
 
   @Get("prompts")
-  prompts() {
+  async prompts(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "prompt:edit");
     return this.prisma.promptTemplate.findMany();
   }
 
@@ -223,7 +246,8 @@ export class AdminController {
   }
 
   @Get("skills")
-  skills() {
+  async skills(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "skill:edit");
     return this.prisma.skill.findMany();
   }
 
@@ -254,7 +278,8 @@ export class AdminController {
   }
 
   @Get("styles")
-  styles() {
+  async styles(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "style:edit");
     return this.prisma.stylePreset.findMany();
   }
 
@@ -269,8 +294,10 @@ export class AdminController {
   }
 
   @Get("mcp-tokens")
-  mcp() {
-    return this.prisma.mcpToken.findMany();
+  async mcp(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "mcp:edit");
+    const rows = await this.prisma.mcpToken.findMany();
+    return rows.map(({ tokenHash: _h, ...rest }) => rest);
   }
 
   @Post("mcp-tokens")
@@ -295,7 +322,8 @@ export class AdminController {
   }
 
   @Get("roles")
-  roles() {
+  async roles(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "role:edit");
     return this.rolesPayload();
   }
 
@@ -311,10 +339,12 @@ export class AdminController {
   async patchRole(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { permissions?: string[] }) {
     await this.assertPerm(req.user.sub, "role:edit");
     if (body.permissions) {
-      await this.prisma.rolePermission.deleteMany({ where: { roleId: id } });
-      const perms = await this.prisma.permission.findMany({ where: { code: { in: body.permissions } } });
-      await this.prisma.rolePermission.createMany({
-        data: perms.map((p) => ({ roleId: id, permissionId: p.id })),
+      await this.prisma.$transaction(async (tx) => {
+        await tx.rolePermission.deleteMany({ where: { roleId: id } });
+        const perms = await tx.permission.findMany({ where: { code: { in: body.permissions } } });
+        await tx.rolePermission.createMany({
+          data: perms.map((p) => ({ roleId: id, permissionId: p.id })),
+        });
       });
     }
     await this.log(req.user.email, "role:edit", id);
@@ -322,19 +352,44 @@ export class AdminController {
   }
 
   @Get("admins")
-  admins() {
-    return this.prisma.adminUser.findMany({
+  async admins(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "admin:edit");
+    const rows = await this.prisma.adminUser.findMany({
       include: { roles: { include: { role: true } } },
     });
+    const roles = await this.prisma.role.findMany({ select: { id: true, name: true } });
+    return {
+      roles,
+      items: rows.map((a) => ({
+        id: a.id,
+        email: a.email,
+        disabled: a.disabled,
+        roles: a.roles.map((r) => ({ id: r.role.id, name: r.role.name })),
+      })),
+    };
+  }
+
+  @Post("admins/:id/roles")
+  async assignRole(@Req() req: AdminReq, @Param("id") id: string, @Body() body: { roleId: string }) {
+    await this.assertPerm(req.user.sub, "admin:edit");
+    await this.prisma.adminRole.upsert({
+      where: { adminId_roleId: { adminId: id, roleId: body.roleId } },
+      create: { adminId: id, roleId: body.roleId },
+      update: {},
+    });
+    await this.log(req.user.email, "admin:role", `${id}:${body.roleId}`);
+    return { ok: true };
   }
 
   @Get("audit")
-  audit() {
+  async audit(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "audit:view");
     return this.prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
   }
 
   @Get("site")
-  site() {
+  async site(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "site:edit");
     return this.prisma.siteConfig.findUnique({ where: { id: "default" } });
   }
 

@@ -11,9 +11,9 @@ import {
   Req,
   Inject,
 } from "@nestjs/common";
-import { ARTICLE_STATUS_LABEL, Anchor, canCopy, canGenerate } from "@yiyi/shared";
+import { ARTICLE_STATUS_LABEL, Anchor, articlePatchSchema, canCopy, canGenerate, hostedAssetUrl, quotaSnapshot, sanitizeArticleHtml } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
-import { GenerateService } from "../generate/generate.service.js";
+import { GenerateService, orderImages } from "../generate/generate.service.js";
 
 function statusLabel(status: string) {
   return ARTICLE_STATUS_LABEL[status as keyof typeof ARTICLE_STATUS_LABEL] ?? "草稿";
@@ -67,27 +67,8 @@ export class ArticlesController {
   }
 
   @Patch(":id")
-  async patch(
-    @Req() req: { user: { sub: string } },
-    @Param("id") id: string,
-    @Body()
-    body: {
-      title?: string;
-      theme?: string;
-      formCode?: string;
-      intentCode?: string;
-      topicCodes?: string[];
-      anchors?: Anchor[];
-      outline?: string;
-      bodyLong?: string;
-      bodyNote?: string;
-      currentNode?: string;
-      styleCode?: string;
-      layout?: unknown;
-      disclosureAck?: boolean;
-      highRiskAck?: boolean;
-    },
-  ) {
+  async patch(@Req() req: { user: { sub: string } }, @Param("id") id: string, @Body() raw: unknown) {
+    const body = articlePatchSchema.parse(raw);
     await this.owned(id, req.user.sub);
     await this.prisma.article.update({
       where: { id },
@@ -99,7 +80,7 @@ export class ArticlesController {
         ...(body.topicCodes != null ? { topicCodes: body.topicCodes } : {}),
         ...(body.anchors != null ? { anchors: body.anchors } : {}),
         ...(body.outline != null ? { outline: body.outline } : {}),
-        ...(body.bodyLong != null ? { bodyLong: body.bodyLong } : {}),
+        ...(body.bodyLong != null ? { bodyLong: sanitizeArticleHtml(body.bodyLong) } : {}),
         ...(body.bodyNote != null ? { bodyNote: body.bodyNote } : {}),
         ...(body.currentNode != null ? { currentNode: body.currentNode } : {}),
         ...(body.styleCode != null ? { styleCode: body.styleCode } : {}),
@@ -135,16 +116,27 @@ export class ArticlesController {
       where: { articleId: id },
       orderBy: { sort: "asc" },
     });
+    const layout = article.layout as { note?: { order?: string[] } } | null;
+    const images = orderImages(assets, layout?.note?.order);
+    const base = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+    const longHtml = sanitizeArticleHtml(article.bodyLong).replace(
+      /src="\/uploads\//g,
+      `src="${base ? `${base}/uploads/` : "/uploads/"}`,
+    );
     return {
-      longHtml: article.bodyLong,
+      longHtml,
       noteText: article.bodyNote,
-      images: assets
-        .filter((a) => a.kind === "image")
-        .map((a, i) => ({ n: i + 1, url: `/uploads/${a.path}`, cover: i === 0 })),
+      images: images.map((a, i) => ({
+        n: i + 1,
+        url: hostedAssetUrl(a.path, base),
+        cover: i === 0,
+      })),
       backends: [
-        { name: "微信公众平台", url: "https://mp.weixin.qq.com/" },
-        { name: "小红书创作中心", url: "https://creator.xiaohongshu.com/" },
+        { name: "微信公众平台", url: "https://mp.weixin.qq.com/", kind: "long" as const },
+        { name: "掘金", url: "https://juejin.cn/editor/drafts/new", kind: "long" as const },
+        { name: "小红书创作中心", url: "https://creator.xiaohongshu.com/", kind: "note" as const },
       ],
+      note: "公众号会过滤外链图片。长文先粘文字，图按下图顺序在后台再传。",
     };
   }
 
@@ -160,11 +152,18 @@ export class ArticlesController {
       where: { id: userId },
       include: { plan: true },
     });
-    const quota = user.plan?.monthlyQuota ?? 2;
+    const monthly = user.plan?.monthlyQuota ?? 2;
+    const snap = quotaSnapshot({
+      quotaUsed: user.quotaUsed,
+      quotaResetAt: user.quotaResetAt,
+      monthlyQuota: monthly,
+    });
     const gate = canGenerate({
       anchors: (article.anchors as Anchor[]) ?? [],
-      quotaLeft: Math.max(0, quota - user.quotaUsed),
+      quotaLeft: snap.quotaLeft,
       subActive: !!user.subExpiresAt && user.subExpiresAt.getTime() > Date.now(),
+      theme: article.theme,
+      topicCodes: article.topicCodes,
     });
     const assets = await this.prisma.asset.findMany({
       where: { articleId: id },
@@ -174,6 +173,8 @@ export class ArticlesController {
       ...article,
       statusLabel: statusLabel(article.status),
       generateBlocked: gate.ok ? null : gate.reason,
+      quotaLeft: snap.quotaLeft,
+      subActive: !!user.subExpiresAt && user.subExpiresAt.getTime() > Date.now(),
       assets: assets.map((a) => ({
         id: a.id,
         kind: a.kind,

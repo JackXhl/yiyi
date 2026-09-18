@@ -218,6 +218,10 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   text-align: center;
   color: var(--yy-muted);
 }
+.upload.over {
+  border-color: var(--yy-green);
+  background: #f0faf4;
+}
 .thumbs { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 .card-asset {
   width: 180px;

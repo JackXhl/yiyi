@@ -37,14 +37,30 @@
         <t-textarea v-model="a.text" :autosize="{ minRows: 2 }" placeholder="写你自己碰到的具体事" @change="a.confirmed = a.text.trim().length >= 4" />
       </div>
       <p class="hint">风格默认系统，可不改。</p>
-      <t-button theme="primary" :disabled="!!gateReason" @click="save(); node = 'media'">下一步</t-button>
+      <div class="chips" v-if="styles.length">
+        <button
+          v-for="s in styles"
+          :key="s.code"
+          type="button"
+          class="chip"
+          :class="{ on: (article.styleCode || 'system') === s.code }"
+          @click="article.styleCode = s.code"
+        >{{ s.labelZh }}</button>
+      </div>
+      <t-button theme="primary" :disabled="!!gateReason" @click="go('media')">下一步</t-button>
       <p class="err" v-if="gateReason">{{ gateReason }}</p>
     </section>
 
     <section v-show="node === 'media'">
-      <div class="upload">
+      <div
+        class="upload"
+        :class="{ over: dragging }"
+        @dragover.prevent="dragging = true"
+        @dragleave="dragging = false"
+        @drop.prevent="onDrop"
+      >
         把现场照片或短视频拖到这里，或
-        <input type="file" multiple accept="image/*,video/mp4" @change="onFiles" />
+        <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4" @change="onFiles" />
       </div>
       <div class="thumbs">
         <div class="card-asset" v-for="as in article.assets" :key="as.id">
@@ -56,9 +72,11 @@
       </div>
       <p style="margin-top: 16px">
         <t-button variant="outline" @click="node = 'topic'">上一步</t-button>
-        <t-button theme="primary" style="margin-left: 8px" :disabled="!!gateReason" @click="run">按这个写</t-button>
+        <t-button theme="primary" style="margin-left: 8px" :disabled="!!gateReason" :loading="running" @click="run">按这个写</t-button>
       </p>
       <p class="err" v-if="gateReason">{{ gateReason }}</p>
+      <p class="err" v-if="uploadErr">{{ uploadErr }}</p>
+      <p class="err" v-if="runErr">{{ runErr }}</p>
       <p class="hint" v-if="article.status === 'generating'">正在写大纲</p>
       <div class="progress" v-if="article.status === 'generating'" />
     </section>
@@ -70,7 +88,7 @@
       </div>
       <div>
         <p class="hint">结构先于文采。想直接看正文就点下一步。</p>
-        <t-button theme="primary" @click="save(); node = 'body'">看正文</t-button>
+        <t-button theme="primary" @click="go('body')">看正文</t-button>
       </div>
     </section>
 
@@ -85,9 +103,9 @@
           <button type="button" class="chip" :class="{ on: preview === 'mp' }" @click="preview = 'mp'">公众号宽</button>
           <button type="button" class="chip" :class="{ on: preview === 'note' }" @click="preview = 'note'">笔记宽</button>
         </div>
-        <div class="preview" :class="preview" v-html="preview === 'note' ? noteHtml : article.bodyLong" />
+        <div class="preview" :class="preview" v-html="previewHtml" />
         <p style="margin-top: 16px">
-          <t-button theme="primary" @click="save(); node = 'adapt'">去适配</t-button>
+          <t-button theme="primary" @click="go('adapt')">去适配</t-button>
         </p>
       </div>
     </section>
@@ -106,7 +124,7 @@
           </p>
         </div>
       </div>
-      <t-button theme="primary" style="margin-top: 16px" @click="save(); node = 'check'">去检查</t-button>
+      <t-button theme="primary" style="margin-top: 16px" @click="go('check')">去检查</t-button>
     </section>
 
     <section v-show="node === 'check' || node === 'copy'">
@@ -115,9 +133,13 @@
       </div>
       <t-checkbox v-model="article.disclosureAck">我已在该站按平台规则做 AI 生成声明</t-checkbox>
       <t-checkbox v-if="highRisk" v-model="article.highRiskAck">已知晓仍复制</t-checkbox>
+      <p class="hint">公众号会过滤外链图片。先粘文字，图按「适配」里的顺序在后台再传。小红书按笔记文案逐张上传。</p>
       <p style="margin-top: 16px">
-        <t-button theme="primary" :disabled="!canCopyNow" @click="copyOpen">复制并打开后台</t-button>
-        <t-button variant="outline" style="margin-left: 8px" :disabled="!canCopyNow" @click="copyText">复制正文</t-button>
+        <t-button theme="primary" :disabled="!canCopyNow" @click="copyOpen('long')">复制长文并打开公众号</t-button>
+        <t-button variant="outline" style="margin-left: 8px" :disabled="!canCopyNow" @click="copyOpen('note')">复制笔记并打开小红书</t-button>
+      </p>
+      <p style="margin-top: 8px">
+        <t-button variant="outline" :disabled="!canCopyNow" @click="copyText">只复制长文</t-button>
       </p>
       <p class="err" v-if="copyErr">{{ copyErr }}</p>
     </section>
@@ -127,8 +149,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { canGenerate } from "@yiyi/shared";
+import { canGenerate, InFlight, sanitizeArticleHtml } from "@yiyi/shared";
 import { api } from "../api";
+import { copyHtml, copyPlain } from "../clip";
 
 const steps = [
   { id: "topic", label: "选题" },
@@ -153,9 +176,12 @@ type Article = {
   bodyNote: string;
   status: string;
   generateBlocked: string | null;
+  quotaLeft?: number;
+  subActive?: boolean;
   disclosureAck: boolean;
   highRiskAck: boolean;
   checkReport: { level: string; text: string }[];
+  styleCode?: string;
   assets: { id: string; kind: string; url: string; analysis?: { caption?: string } }[];
   layout?: { long?: { coverId?: string | null }; note?: { order?: string[] } };
 };
@@ -172,21 +198,28 @@ const options = ref<{ form: Opt[]; intent: Opt[]; topicL1: Opt[]; topicMore: Opt
 const node = ref("topic");
 const preview = ref<"desk" | "mp" | "note">("mp");
 const copyErr = ref("");
+const uploadErr = ref("");
+const runErr = ref("");
+const dragging = ref(false);
+const styles = ref<{ code: string; labelZh: string }[]>([]);
+const running = ref(false);
+const flight = new InFlight();
 
 const gateReason = computed(() => {
   const a = article.value;
   if (!a) return "";
-  const local = canGenerate({
-    anchors: a.anchors.map((x) => ({
-      ...x,
-      confirmed: x.confirmed || x.text.trim().length >= 4,
-    })),
-    quotaLeft: 99,
-    subActive: true,
-  });
-  if (!local.ok) return local.reason ?? "";
-  if (a.generateBlocked && /到期|篇数/.test(a.generateBlocked)) return a.generateBlocked;
-  return "";
+  return (
+    canGenerate({
+      anchors: a.anchors.map((x) => ({
+        ...x,
+        confirmed: x.confirmed || x.text.trim().length >= 4,
+      })),
+      quotaLeft: a.quotaLeft ?? 99,
+      subActive: a.subActive !== false,
+      theme: a.theme,
+      topicCodes: a.topicCodes,
+    }).reason ?? ""
+  );
 });
 
 const report = computed(() => article.value?.checkReport ?? []);
@@ -199,6 +232,9 @@ const canCopyNow = computed(() => {
   return true;
 });
 const noteHtml = computed(() => (article.value?.bodyNote || "").replace(/\n/g, "<br/>"));
+const previewHtml = computed(() =>
+  sanitizeArticleHtml(preview.value === "note" ? noteHtml.value : article.value?.bodyLong || ""),
+);
 const imageAssets = computed(() => {
   const all = (article.value?.assets || []).filter((a) => a.kind === "image");
   const order = article.value?.layout?.note?.order;
@@ -209,6 +245,11 @@ const imageAssets = computed(() => {
 
 onMounted(async () => {
   options.value = await api("/api/topic-options");
+  try {
+    styles.value = (await api<{ items: { code: string; labelZh: string }[] }>("/api/styles")).items;
+  } catch {
+    styles.value = [{ code: "system", labelZh: "系统默认" }];
+  }
   if (!route.params.id) {
     const created = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
     await router.replace(`/write/${created.id}`);
@@ -233,45 +274,89 @@ function toggleTopic(code: string) {
   else article.value.topicCodes = [...cur, code].slice(0, 2);
 }
 
+async function go(next: string) {
+  await save();
+  node.value = next;
+}
+
 async function save() {
   if (!article.value) return;
-  article.value = await api(`/api/articles/${article.value.id}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      theme: article.value.theme,
-      formCode: article.value.formCode,
-      intentCode: article.value.intentCode,
-      topicCodes: article.value.topicCodes,
-      anchors: article.value.anchors,
-      outline: article.value.outline,
-      bodyLong: article.value.bodyLong,
-      bodyNote: article.value.bodyNote,
-      layout: article.value.layout,
-      currentNode: node.value,
-      disclosureAck: article.value.disclosureAck,
-      highRiskAck: article.value.highRiskAck,
-    }),
-  });
+  if (!flight.enter("save")) return;
+  try {
+    article.value = await api(`/api/articles/${article.value.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        theme: article.value.theme,
+        formCode: article.value.formCode,
+        intentCode: article.value.intentCode,
+        topicCodes: article.value.topicCodes,
+        anchors: article.value.anchors,
+        outline: article.value.outline,
+        bodyLong: article.value.bodyLong,
+        bodyNote: article.value.bodyNote,
+        layout: article.value.layout,
+        styleCode: article.value.styleCode || "system",
+        currentNode: node.value,
+        disclosureAck: article.value.disclosureAck,
+        highRiskAck: article.value.highRiskAck,
+      }),
+    });
+  } finally {
+    flight.leave("save");
+  }
 }
 
 async function run() {
-  await save();
+  if (!flight.enter("run")) return;
+  runErr.value = "";
+  running.value = true;
+  try {
+    await save();
+    if (!article.value) return;
+    article.value = await api(`/api/articles/${article.value.id}/generate`, { method: "POST" });
+    node.value = "outline";
+  } catch (e) {
+    runErr.value = e instanceof Error ? e.message : "还写不了";
+  } finally {
+    running.value = false;
+    flight.leave("run");
+  }
+}
+
+async function uploadList(files: FileList | File[]) {
   if (!article.value) return;
-  article.value = await api(`/api/articles/${article.value.id}/generate`, { method: "POST" });
-  node.value = "outline";
+  if (!flight.enter("upload")) return;
+  uploadErr.value = "";
+  try {
+    const fd = new FormData();
+    for (const f of files) fd.append("files", f);
+    const res = await fetch(`/api/articles/${article.value.id}/assets`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("yiyi.token") || ""}` },
+      body: fd,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      uploadErr.value = (data as { message?: string }).message || "上传失败";
+      return;
+    }
+    await load();
+  } finally {
+    flight.leave("upload");
+  }
 }
 
 async function onFiles(ev: Event) {
   const files = (ev.target as HTMLInputElement).files;
-  if (!files?.length || !article.value) return;
-  const fd = new FormData();
-  for (const f of files) fd.append("files", f);
-  await fetch(`/api/articles/${article.value.id}/assets`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("yiyi.token") || ""}` },
-    body: fd,
-  });
-  await load();
+  if (!files?.length) return;
+  await uploadList(files);
+}
+
+function onDrop(ev: DragEvent) {
+  dragging.value = false;
+  const files = ev.dataTransfer?.files;
+  if (!files?.length) return;
+  void uploadList(files);
 }
 
 async function confirmAsset(id: string) {
@@ -307,31 +392,57 @@ async function moveAsset(index: number, dir: number) {
     method: "POST",
     body: JSON.stringify({ ids }),
   });
-  await load();
+  article.value.layout = {
+    ...(article.value.layout || {}),
+    long: { coverId: ids[0] ?? null },
+    note: { order: ids },
+  };
+  await save();
 }
 
-async function copyOpen() {
+async function copyOpen(kind: "long" | "note") {
+  if (!flight.enter("copy")) return;
   copyErr.value = "";
   try {
     await save();
-    const pack = await api<{ longHtml: string; backends: { name: string; url: string }[] }>(
-      `/api/articles/${article.value!.id}/copy-pack`,
-    );
-    await navigator.clipboard.writeText(pack.longHtml);
-    window.open(pack.backends[0]?.url || "https://mp.weixin.qq.com/", "_blank");
+    const pack = await api<{
+      longHtml: string;
+      noteText: string;
+      backends: { name: string; url: string; kind: string }[];
+    }>(`/api/articles/${article.value!.id}/copy-pack`);
+    if (kind === "note") {
+      await copyPlain(pack.noteText);
+      window.open(pack.backends.find((b) => b.kind === "note")?.url || "https://creator.xiaohongshu.com/", "_blank");
+      return;
+    }
+    await copyHtml(pack.longHtml);
+    window.open(pack.backends.find((b) => b.kind === "long")?.url || "https://mp.weixin.qq.com/", "_blank");
   } catch (e) {
-    copyErr.value = e instanceof Error ? e.message : "不能复制";
+    copyErr.value = e instanceof Error && /Clipboard|clipboard|NotAllowed/i.test(e.message)
+      ? "复制失败，请再点一次"
+      : e instanceof Error
+        ? e.message
+        : "不能复制";
+  } finally {
+    flight.leave("copy");
   }
 }
 
 async function copyText() {
+  if (!flight.enter("copy")) return;
   copyErr.value = "";
   try {
     await save();
     const pack = await api<{ longHtml: string }>(`/api/articles/${article.value!.id}/copy-pack`);
-    await navigator.clipboard.writeText(pack.longHtml);
+    await copyHtml(pack.longHtml);
   } catch (e) {
-    copyErr.value = e instanceof Error ? e.message : "不能复制";
+    copyErr.value = e instanceof Error && /Clipboard|clipboard|NotAllowed/i.test(e.message)
+      ? "复制失败，请再点一次"
+      : e instanceof Error
+        ? e.message
+        : "不能复制";
+  } finally {
+    flight.leave("copy");
   }
 }
 </script>

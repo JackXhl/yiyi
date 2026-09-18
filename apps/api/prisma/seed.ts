@@ -145,8 +145,13 @@ async function main() {
 
   await prisma.stylePreset.upsert({
     where: { code: "system" },
-    update: {},
-    create: { code: "system", labelZh: "系统默认", rights: "system", params: { cut: true } },
+    update: { params: { cut: true, hint: "短句。先写看见的，再写做了什么。不写金句，不编对话和数字。" } },
+    create: {
+      code: "system",
+      labelZh: "系统默认",
+      rights: "system",
+      params: { cut: true, hint: "短句。先写看见的，再写做了什么。不写金句，不编对话和数字。" },
+    },
   });
 
   await prisma.siteConfig.upsert({

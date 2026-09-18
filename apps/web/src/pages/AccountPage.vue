@@ -8,7 +8,7 @@
     <h3 style="font-size: 16px; margin: 24px 0 8px">开通</h3>
     <div v-for="p in plans" :key="p.id" style="padding: 8px 0; border-bottom: 1px solid #e7e7e7">
       {{ p.name }}　{{ p.priceYuan === "0" ? "免费体验" : p.priceYuan + " 元" }}　{{ p.monthlyQuota }} 篇 / 月
-      <t-button size="small" variant="outline" style="margin-left: 12px" @click="buy(p.id)">开通</t-button>
+      <t-button size="small" variant="outline" style="margin-left: 12px" :loading="buying === p.id" @click="buy(p.id)">开通</t-button>
     </div>
     <h3 style="font-size: 16px; margin: 24px 0 8px">订单</h3>
     <p class="hint" v-if="!me?.orders?.length">还没有订单</p>
@@ -24,6 +24,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api";
 import { useAuth } from "../stores/auth";
+import { InFlight } from "@yiyi/shared";
 
 const me = ref<{
   email: string;
@@ -35,8 +36,10 @@ const me = ref<{
   orders: { id: string; amountFen: number; status: string }[];
 } | null>(null);
 const plans = ref<{ id: string; name: string; monthlyQuota: number; priceYuan: string }[]>([]);
+const buying = ref("");
 const router = useRouter();
 const auth = useAuth();
+const flight = new InFlight();
 
 onMounted(async () => {
   me.value = await api("/api/me");
@@ -44,13 +47,20 @@ onMounted(async () => {
 });
 
 async function buy(planId: string) {
-  const order = await api<{ orderId: string; mock: boolean }>("/api/billing/orders", {
-    method: "POST",
-    body: JSON.stringify({ planId }),
-  });
-  if (order.mock) {
-    await api(`/api/billing/orders/${order.orderId}/mock-pay`, { method: "POST" });
-    me.value = await api("/api/me");
+  if (!flight.enter(`buy:${planId}`)) return;
+  buying.value = planId;
+  try {
+    const order = await api<{ orderId: string; mock: boolean }>("/api/billing/orders", {
+      method: "POST",
+      body: JSON.stringify({ planId }),
+    });
+    if (order.mock) {
+      await api(`/api/billing/orders/${order.orderId}/mock-pay`, { method: "POST" });
+      me.value = await api("/api/me");
+    }
+  } finally {
+    buying.value = "";
+    flight.leave(`buy:${planId}`);
   }
 }
 

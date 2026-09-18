@@ -5,11 +5,11 @@
       <p class="sub">邮箱加密码。注册后有体验额度，先写一篇试试。</p>
       <div class="field">
         <label>邮箱</label>
-        <t-input v-model="email" placeholder="you@example.com" />
+        <t-input v-model="email" placeholder="you@example.com" @enter="onSubmit" />
       </div>
       <div class="field">
         <label>密码</label>
-        <t-input v-model="password" type="password" placeholder="至少 8 位" />
+        <t-input v-model="password" type="password" placeholder="至少 8 位" @enter="onSubmit" />
       </div>
       <t-button theme="primary" block :loading="loading" @click="onSubmit">注册</t-button>
       <p class="err" v-if="err">{{ err }}</p>
@@ -31,6 +31,7 @@ const router = useRouter();
 const auth = useAuth();
 
 async function onSubmit() {
+  if (loading.value) return;
   err.value = "";
   loading.value = true;
   try {

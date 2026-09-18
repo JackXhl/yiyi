@@ -21,3 +21,18 @@ export class TopicController {
     };
   }
 }
+
+@Controller("styles")
+export class StylesController {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  @Get()
+  async list() {
+    const items = await this.prisma.stylePreset.findMany({
+      where: { enabled: true },
+      select: { code: true, labelZh: true },
+      orderBy: { code: "asc" },
+    });
+    return { items };
+  }
+}

@@ -1,6 +1,11 @@
-import { Body, Controller, Get, Inject, Param, Post, Req } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, HttpException, Inject, Param, Post, Req } from "@nestjs/common";
 import { PrismaService } from "../prisma.service.js";
 import { Public } from "../auth/public.js";
+import { monthWindowEnd, orderCreateSchema } from "@yiyi/shared";
+
+export function canConfirmMockPay(order: { mock: boolean }, mockEnv = process.env.WECHAT_PAY_MOCK) {
+  return order.mock === true && mockEnv !== "false";
+}
 
 @Controller("billing")
 export class BillingController {
@@ -23,8 +28,10 @@ export class BillingController {
   }
 
   @Post("orders")
-  async create(@Req() req: { user: { sub: string } }, @Body() body: { planId: string }) {
-    const plan = await this.prisma.plan.findUniqueOrThrow({ where: { id: body.planId } });
+  async create(@Req() req: { user: { sub: string } }, @Body() raw: unknown) {
+    const body = orderCreateSchema.parse(raw);
+    const plan = await this.prisma.plan.findUnique({ where: { id: body.planId } });
+    if (!plan?.enabled) throw new HttpException("找不到这个套餐", 400);
     const order = await this.prisma.order.create({
       data: {
         userId: req.user.sub,
@@ -56,6 +63,9 @@ export class BillingController {
     const order = await this.prisma.order.findFirstOrThrow({
       where: { id, userId: req.user.sub, status: "pending" },
     });
+    if (!canConfirmMockPay(order)) {
+      throw new ForbiddenException("未开启演示支付");
+    }
     const plan = await this.prisma.plan.findUniqueOrThrow({ where: { id: order.planId } });
     const expires = new Date(Date.now() + plan.durationDays * 24 * 3600 * 1000);
     await this.prisma.$transaction([
@@ -65,7 +75,7 @@ export class BillingController {
       }),
       this.prisma.user.update({
         where: { id: req.user.sub },
-        data: { planId: plan.id, subExpiresAt: expires, quotaUsed: 0 },
+        data: { planId: plan.id, subExpiresAt: expires, quotaUsed: 0, quotaResetAt: monthWindowEnd(new Date()) },
       }),
     ]);
     return { ok: true, subExpiresAt: expires };

@@ -22,12 +22,19 @@
 
 <script setup lang="ts">
 import { useRouter } from "vue-router";
+import { InFlight } from "@yiyi/shared";
 import { api } from "../api";
 
 const router = useRouter();
+const flight = new InFlight();
 
 async function goWrite() {
-  const a = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
-  router.push(`/write/${a.id}`);
+  if (!flight.enter("write")) return;
+  try {
+    const a = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
+    router.push(`/write/${a.id}`);
+  } finally {
+    flight.leave("write");
+  }
 }
 </script>

@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { canGenerate, type Anchor } from "@yiyi/shared";
 import {
   buildLayout,
+  longHtmlFromProse,
   longHtmlWithImages,
   machineCheck,
   noteTextWithOrder,
+  orderImages,
+  stripModelText,
 } from "./generate.service";
 
 const anchors: Anchor[] = [
@@ -45,5 +48,35 @@ describe("layout", () => {
 
   it("tells note copy to upload in order", () => {
     expect(noteTextWithOrder("换灯管", anchors, 2)).toContain("第 1 张");
+  });
+
+  it("orders copy-pack images by layout, not upload sort", () => {
+    const assets = [
+      { id: "img1", kind: "image", path: "a.jpg" },
+      { id: "img2", kind: "image", path: "b.jpg" },
+    ];
+    const ordered = orderImages(assets, ["img2", "img1"]);
+    expect(ordered.map((a) => a.id)).toEqual(["img2", "img1"]);
+  });
+
+  it("uses stripped model prose instead of dumping HTML", () => {
+    const assets = [{ id: "img1", kind: "image", path: "a.jpg", analysis: { caption: "灯管" } }];
+    const layout = buildLayout(assets);
+    const html = longHtmlFromProse(
+      `<script>x()</script>我把店里闪了两周的灯管换了，客人说看菜单终于不费劲。梯子有点晃，我一只手扶墙。换完前台不再闪。`,
+      "换灯管",
+      anchors,
+      assets,
+      layout,
+    );
+    expect(html).not.toContain("script");
+    expect(html).toContain("灯管换了");
+    expect(html).toContain("/uploads/a.jpg");
+  });
+
+  it("falls back when the model returns almost nothing", () => {
+    const html = longHtmlFromProse("短", "换灯管", anchors, [], buildLayout([]));
+    expect(html).toContain("上周三晚上店里灯管一直闪");
+    expect(stripModelText("<p>现场</p>")).toBe("现场");
   });
 });

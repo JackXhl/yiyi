@@ -13,6 +13,20 @@
     </div>
     <el-button size="small" style="margin-top: 8px" @click="save(r)">保存权限</el-button>
   </div>
+  <h3 style="margin-top: 24px">把角色赋给运营账号</h3>
+  <el-table :data="admins" style="margin-top: 8px">
+    <el-table-column prop="email" label="邮箱" />
+    <el-table-column label="角色">
+      <template #default="{ row }">{{ row.roles.map((r: { name: string }) => r.name).join("、") || "—" }}</template>
+    </el-table-column>
+    <el-table-column label="操作" width="220">
+      <template #default="{ row }">
+        <el-select placeholder="加角色" size="small" @change="(v: string) => assign(row.id, v)">
+          <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
+        </el-select>
+      </template>
+    </el-table-column>
+  </el-table>
 </template>
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
@@ -22,12 +36,15 @@ import { adminApi } from "../http";
 type Role = { id: string; name: string; permissions: string[] };
 const roles = ref<Role[]>([]);
 const permissions = ref<string[]>([]);
+const admins = ref<{ id: string; email: string; roles: { id: string; name: string }[] }[]>([]);
 const name = ref("");
 
 async function load() {
   const data = await adminApi<{ roles: Role[]; permissions: string[] }>("/api/admin/roles");
   roles.value = data.roles;
   permissions.value = data.permissions;
+  const staff = await adminApi<{ items: typeof admins.value }>("/api/admin/admins");
+  admins.value = staff.items;
 }
 onMounted(load);
 
@@ -49,5 +66,14 @@ async function save(r: Role) {
   });
   roles.value = data.roles;
   ElMessage.success("已保存");
+}
+
+async function assign(adminId: string, roleId: string) {
+  await adminApi(`/api/admin/admins/${adminId}/roles`, {
+    method: "POST",
+    body: JSON.stringify({ roleId }),
+  });
+  ElMessage.success("已赋角色");
+  await load();
 }
 </script>

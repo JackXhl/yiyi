@@ -1,7 +1,7 @@
 import { ConflictException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
-import { credentialsSchema } from "@yiyi/shared";
+import { credentialsSchema, monthWindowEnd } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
 
 @Injectable()
@@ -22,6 +22,7 @@ export class AuthService {
         passwordHash: await bcrypt.hash(creds.password, 10),
         planId: trial?.id,
         subExpiresAt: new Date(Date.now() + 14 * 24 * 3600 * 1000),
+        quotaResetAt: monthWindowEnd(new Date()),
       },
     });
     return this.issue(user.id, user.email);

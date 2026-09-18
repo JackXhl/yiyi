@@ -22,12 +22,14 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { InFlight } from "@yiyi/shared";
 import { api } from "../api";
 
 type Item = { id: string; title: string; status: string; cover: string | null; updatedAt: string };
 const items = ref<Item[]>([]);
 const loaded = ref(false);
 const router = useRouter();
+const flight = new InFlight();
 
 onMounted(async () => {
   const data = await api<{ items: Item[] }>("/api/articles");
@@ -36,8 +38,13 @@ onMounted(async () => {
 });
 
 async function create() {
-  const a = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
-  router.push(`/write/${a.id}`);
+  if (!flight.enter("create")) return;
+  try {
+    const a = await api<{ id: string }>("/api/articles", { method: "POST", body: "{}" });
+    router.push(`/write/${a.id}`);
+  } finally {
+    flight.leave("create");
+  }
 }
 
 function format(s: string) {

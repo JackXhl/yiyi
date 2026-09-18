@@ -12,8 +12,10 @@ import {
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { randomUUID } from "node:crypto";
+import { unlink } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { ALLOWED_ASSET_MIME, acceptAssetFile } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
 import { LlmService } from "../generate/llm.service.js";
 
@@ -27,6 +29,10 @@ export class AssetsController {
   @Post()
   @UseInterceptors(
     FilesInterceptor("files", 10, {
+      limits: { fileSize: 40_000_000 },
+      fileFilter: (_req, file, cb) => {
+        cb(null, (ALLOWED_ASSET_MIME as readonly string[]).includes(file.mimetype));
+      },
       storage: diskStorage({
         destination: join(process.cwd(), "uploads"),
         filename: (_req, file, cb) => cb(null, randomUUID() + extname(file.originalname || ".bin")),
@@ -42,8 +48,16 @@ export class AssetsController {
     if (!article) throw new BadRequestException("找不到这篇稿");
     const existing = await this.prisma.asset.findMany({ where: { articleId: id } });
     const incoming = files ?? [];
-    const newImages = incoming.filter((f) => !f.mimetype.startsWith("video")).length;
-    const newVideos = incoming.filter((f) => f.mimetype.startsWith("video")).length;
+    if (!incoming.length) throw new BadRequestException("只收照片或 MP4 短视频");
+    for (const file of incoming) {
+      const denied = acceptAssetFile({ mimetype: file.mimetype, size: file.size });
+      if (denied) {
+        await unlink(file.path).catch(() => undefined);
+        throw new BadRequestException(denied);
+      }
+    }
+    const newImages = incoming.filter((f) => f.mimetype.startsWith("image")).length;
+    const newVideos = incoming.filter((f) => f.mimetype === "video/mp4").length;
     const imageCount = existing.filter((a) => a.kind === "image").length + newImages;
     const videoCount = existing.filter((a) => a.kind === "video").length + newVideos;
     if (imageCount > 9) throw new BadRequestException("图片最多 9 张");
@@ -76,7 +90,7 @@ export class AssetsController {
   ) {
     const article = await this.prisma.article.findFirst({ where: { id, userId: req.user.sub } });
     if (!article) throw new BadRequestException("找不到这篇稿");
-    const ids = body.ids ?? [];
+    const ids = (body.ids ?? []).slice(0, 9).filter((id) => typeof id === "string" && id.length > 0 && id.length <= 64);
     await this.prisma.$transaction(
       ids.map((assetId, sort) =>
         this.prisma.asset.updateMany({ where: { id: assetId, articleId: id }, data: { sort } }),
@@ -95,7 +109,7 @@ export class AssetsController {
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, article: { id, userId: req.user.sub } },
     });
-    if (!asset) throw new Error("找不到素材");
+    if (!asset) throw new BadRequestException("找不到素材");
     await this.prisma.asset.update({ where: { id: assetId }, data: { confirmed: true } });
     if (body.asAnchor) {
       const article = await this.prisma.article.findUniqueOrThrow({ where: { id } });

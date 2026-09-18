@@ -11,7 +11,7 @@ import { GenerateService } from "./generate/generate.service.js";
 import { LlmService } from "./generate/llm.service.js";
 import { BillingController } from "./billing/billing.controller.js";
 import { AdminController } from "./admin/admin.controller.js";
-import { TopicController } from "./topic/topic.controller.js";
+import { TopicController, StylesController } from "./topic/topic.controller.js";
 import { McpController } from "./mcp/mcp.controller.js";
 
 @Module({
@@ -29,6 +29,7 @@ import { McpController } from "./mcp/mcp.controller.js";
     BillingController,
     AdminController,
     TopicController,
+    StylesController,
     McpController,
   ],
   providers: [
