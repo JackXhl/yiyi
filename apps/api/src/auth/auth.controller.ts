@@ -56,6 +56,7 @@ export class AuthController {
     return {
       id: user.id,
       email: user.email,
+      planId: user.planId,
       planName: user.plan?.name ?? "体验",
       quotaLeft: snap.quotaLeft,
       quota: quota,

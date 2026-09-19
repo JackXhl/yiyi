@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-const base = process.env.LIVE_HTTP_BASE || "http://127.0.0.1:3000";
+const base = process.env.LIVE_HTTP_BASE || "http://127.0.0.1:18470";
 const live = process.env.LIVE_HTTP === "1";
 
 async function req(path: string, init: RequestInit = {}) {

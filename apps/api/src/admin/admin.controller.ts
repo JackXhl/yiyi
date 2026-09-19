@@ -62,11 +62,11 @@ export class AdminController {
       this.prisma.article.count({ where: { createdAt: { gte: startOfDay() } } }),
     ]);
     return {
-      rows: [
-        { label: "今日成稿相关", value: articles },
-        { label: "失败任务", value: jobsFail },
-        { label: "注册用户", value: users },
-      ],
+      stats: {
+        users,
+        articlesToday: articles,
+        jobsFailed: jobsFail,
+      },
     };
   }
 
@@ -132,8 +132,12 @@ export class AdminController {
       items: items.map((a) => ({
         id: a.id,
         email: mask(a.user.email),
-        title: a.title || "未命名",
+        title: a.title || a.theme || "未命名",
+        theme: a.theme,
         status: a.status,
+        bodyLong: a.bodyLong,
+        bodyNote: a.bodyNote,
+        anchors: ((a.anchors as { text?: string }[]) || []).map((x) => x.text || "").filter(Boolean),
       })),
     };
   }

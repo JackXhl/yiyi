@@ -13,6 +13,8 @@ import {
   mcpCallSchema,
   orderCreateSchema,
   htmlToPlain,
+  pasteToPlain,
+  plainToHtml,
 } from "./index";
 
 describe("canGenerate", () => {
@@ -26,7 +28,7 @@ describe("canGenerate", () => {
       ],
     });
     expect(r.ok).toBe(false);
-    expect(r.reason).toContain("还差一条");
+    expect(r.reason).toContain("事实依据");
   });
 
   it("allows two real confirmed anchors", () => {
@@ -70,7 +72,7 @@ describe("canGenerate", () => {
         theme: "我把店里闪了两周的灯管换了",
         topicCodes: [],
       }).reason,
-    ).toContain("哪一类");
+    ).toContain("内容类目");
     expect(
       canGenerate({
         subActive: true,
@@ -210,5 +212,23 @@ describe("payload schemas", () => {
   it("turns copied html into paste-safe plain text", () => {
     expect(htmlToPlain('<p>灯</p><img src="/uploads/a.jpg" alt="" /><p>亮</p>')).toContain("[图]");
     expect(htmlToPlain("<script>x()</script>灯")).toBe("灯");
+  });
+
+  it("rebuilds html from the plain editor without exposing tags", () => {
+    const src = '<p>灯管闪了</p><p><img src="/uploads/a.jpg" alt="灯管" /></p><p>换完不闪</p>';
+    const plain = htmlToPlain(src);
+    expect(plain).not.toMatch(/<p>/);
+    const back = plainToHtml(plain, src);
+    expect(back).toContain("<p>灯管闪了</p>");
+    expect(back).toContain('<img src="/uploads/a.jpg" alt="灯管" />');
+    expect(back).toContain("<p>换完不闪</p>");
+    expect(plainToHtml("第一段\n\n第二段")).toBe("<p>第一段</p><p>第二段</p>");
+    expect(plainToHtml("<script>x()</script>")).toBe("<p>&lt;script&gt;x()&lt;/script&gt;</p>");
+  });
+
+  it("prefers clipboard plain text and strips pasted html", () => {
+    expect(pasteToPlain({ text: "灯\n\n亮", html: "<p>别用这段</p>" })).toBe("灯\n\n亮");
+    expect(pasteToPlain({ html: "<p>灯</p><script>x()</script><p>亮</p>" })).toBe("灯\n\n亮");
+    expect(pasteToPlain({})).toBe("");
   });
 });

@@ -79,7 +79,8 @@ export function longHtmlFromProse(
   layout: LayoutPlan,
 ) {
   const text = stripModelText(prose);
-  if (text.length < 40) return longHtmlWithImages(theme, anchors, assets, layout);
+  const cjk = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (text.length < 8 || cjk < 16) return longHtmlWithImages(theme, anchors, assets, layout);
   const paras = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   return interleaveImages(paras, assets, layout);
 }
@@ -107,7 +108,7 @@ export function machineCheck(html: string, intentCode: string, anchors: Anchor[]
   if (intentCode === "intent.promo") {
     issues.push({
       level: "high",
-      text: "这篇带安利/种草，复制前须按平台规则做广告与 AI 生成声明",
+      text: "这篇属于商品推荐，复制前须按平台规则做广告与 AI 生成声明",
     });
   }
   if (anchors.length && text.length < 40) {
@@ -217,7 +218,8 @@ export class GenerateService {
           ? `笔法：${String((style.params as { hint?: string }).hint || "").slice(0, 800)}`
           : "";
       const bodyPrompt = [
-        bodyTpl?.body || "只写已确认事实。禁止编造对话和数字。不要输出 HTML。分段写，一段一事。",
+        bodyTpl?.body || "只写已确认事实。禁止编造对话和数字。",
+        "不要输出 HTML。分段写，一段一事，每条已确认事实至少写一段。用第一人称讲现场，不编对话和数字。",
         skillHint,
         styleHint,
         `主题：${article.theme}`,

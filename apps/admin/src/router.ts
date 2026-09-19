@@ -1,9 +1,12 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { canOpenPath, firstAllowedPath, ROUTE_TITLE } from "./copy";
+import { adminApi } from "./http";
+import { adminPermissions, adminToken, clearAdminSession, saveAdminPermissions } from "./session";
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/login", component: () => import("./pages/Login.vue") },
+    { path: "/login", component: () => import("./pages/Login.vue"), meta: { title: "控制台登录" } },
     {
       path: "/",
       component: () => import("./layouts/Shell.vue"),
@@ -27,8 +30,29 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
-  if (to.path !== "/login" && !localStorage.getItem("yiyi.admin")) return "/login";
+router.beforeEach(async (to) => {
+  if (to.path === "/login") {
+    document.title = "控制台登录 · 一意控制台";
+    return true;
+  }
+  if (!adminToken()) return "/login";
+  let perms = adminPermissions();
+  if (!perms.length) {
+    try {
+      const me = await adminApi<{ permissions: string[] }>("/api/admin/me");
+      saveAdminPermissions(me.permissions);
+      perms = me.permissions;
+    } catch {
+      clearAdminSession();
+      return "/login";
+    }
+  }
+  if (!canOpenPath(to.path, perms)) {
+    const next = firstAllowedPath(perms);
+    if (next !== to.path) return next;
+  }
+  const name = ROUTE_TITLE[to.path] || "一意控制台";
+  document.title = `${name} · 一意控制台`;
   return true;
 });
 

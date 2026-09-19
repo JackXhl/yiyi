@@ -55,18 +55,18 @@ async function main() {
   });
 
   const form = [
-    ["form.long", "一篇能发公众号的长文", 1, false],
-    ["form.note", "一组能发小红书的图", 2, false],
-    ["form.both", "两个都要", 3, false],
+    ["form.long", "公众号长文", 1, false],
+    ["form.note", "小红书图文", 2, false],
+    ["form.both", "长文与笔记", 3, false],
   ] as const;
   for (const [code, labelZh, sort] of form) {
     await upsertOpt(code, labelZh, "form", sort, false, "");
   }
   const intent = [
-    ["intent.story", "把我经历过的事讲清楚", 1, ""],
-    ["intent.howto", "教别人一步一步做", 2, ""],
-    ["intent.opinion", "说说我的看法", 3, ""],
-    ["intent.promo", "安利 / 种草", 4, "advertising"],
+    ["intent.story", "经历叙述", 1, ""],
+    ["intent.howto", "方法教程", 2, ""],
+    ["intent.opinion", "观点评论", 3, ""],
+    ["intent.promo", "商品推荐", 4, "advertising"],
   ] as const;
   for (const [code, labelZh, sort, risk] of intent) {
     await upsertOpt(code, labelZh, "intent_genre", sort, false, risk);
@@ -165,7 +165,7 @@ async function main() {
     await prisma.promptTemplate.createMany({
       data: [
         { node: "outline", body: "用用户锚点排背景-发生-结果-边界，不写金句。" },
-        { node: "body", body: "只写已确认事实。禁止编造对话和数字。" },
+        { node: "body", body: "只写已确认事实。禁止编造对话和数字。不要输出 HTML。分段写，一段一事，每条事实至少一段。" },
       ],
     });
   }

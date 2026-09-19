@@ -12,6 +12,7 @@
 | [06-craft-voice.md](06-craft-voice.md) | 用户当记者、一次删减、禁止过检测 |
 | [07-style.md](07-style.md) | 默认系统风格、权利标记 |
 | [08-taxonomy.md](08-taxonomy.md) | 四轴、白话选项、营销可识别 |
+| [09-copy.md](09-copy.md) | 菜单、芯片、权限中文名、字段说明 |
 | [../taxonomy/SOURCES.md](../taxonomy/SOURCES.md) | 类目采集源 |
 
 C 端 `apps/web`（TDesign），运营端 `apps/admin`（Element Plus），API `apps/api`（Nest + Prisma + PostgreSQL）。

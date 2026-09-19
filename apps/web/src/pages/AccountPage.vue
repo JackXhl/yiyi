@@ -1,19 +1,27 @@
 <template>
   <div>
-    <h2 style="font-size: 20px; margin: 0 0 16px">账号</h2>
-    <p>邮箱：{{ me?.email }}</p>
-    <p>套餐：{{ me?.planName }}　剩余 {{ me?.quotaLeft }} / {{ me?.quota }} 篇</p>
-    <p>到期：{{ me?.subExpiresAt ? new Date(me.subExpiresAt).toLocaleString("zh-CN") : "—" }}</p>
-    <p v-if="!me?.subActive" class="err">订阅已到期，只能看已有稿。</p>
-    <h3 style="font-size: 16px; margin: 24px 0 8px">开通</h3>
-    <div v-for="p in plans" :key="p.id" style="padding: 8px 0; border-bottom: 1px solid #e7e7e7">
-      {{ p.name }}　{{ p.priceYuan === "0" ? "免费体验" : p.priceYuan + " 元" }}　{{ p.monthlyQuota }} 篇 / 月
-      <t-button size="small" variant="outline" style="margin-left: 12px" :loading="buying === p.id" @click="buy(p.id)">开通</t-button>
+    <h1 class="page-title">账户</h1>
+    <div class="account-card">
+      <p style="margin: 0 0 8px">{{ me?.email }}</p>
+      <p style="margin: 0" class="hint">
+        {{ me?.planName }} · 剩余 {{ me?.quotaLeft }} / {{ me?.quota }} 篇
+        · 到期 {{ me?.subExpiresAt ? new Date(me.subExpiresAt).toLocaleString("zh-CN") : "—" }}
+      </p>
+      <p v-if="!me?.subActive" class="err">订阅已到期，仅可查看已有作品。</p>
     </div>
-    <h3 style="font-size: 16px; margin: 24px 0 8px">订单</h3>
+    <h2 class="page-title" style="font-size: 16px; margin-top: 8px">开通套餐</h2>
+    <div class="plan-card" v-for="p in plans" :key="p.id" :class="{ current: isCurrent(p) }">
+      <div class="grow">
+        <div>{{ p.name }}</div>
+        <div class="hint">{{ p.priceYuan === "0" ? "免费体验" : p.priceYuan + " 元" }} · {{ p.monthlyQuota }} 篇 / 月</div>
+      </div>
+      <span v-if="isCurrent(p)" class="chip on">当前套餐</span>
+      <t-button v-else size="small" theme="primary" :loading="buying === p.id" @click="buy(p.id)">开通</t-button>
+    </div>
+    <h2 class="page-title" style="font-size: 16px; margin-top: 8px">订单</h2>
     <p class="hint" v-if="!me?.orders?.length">还没有订单</p>
-    <div v-for="o in me?.orders || []" :key="o.id" class="check-item">
-      {{ (o.amountFen / 100).toFixed(0) }} 元　{{ o.status === "paid" ? "已支付" : o.status === "pending" ? "待支付" : o.status }}
+    <div v-for="o in me?.orders || []" :key="o.id" class="order-row">
+      {{ (o.amountFen / 100).toFixed(0) }} 元 · {{ o.status === "paid" ? "已支付" : o.status === "pending" ? "待支付" : o.status }}
     </div>
     <p style="margin-top: 24px"><t-button variant="outline" @click="out">退出</t-button></p>
   </div>
@@ -28,6 +36,7 @@ import { InFlight } from "@yiyi/shared";
 
 const me = ref<{
   email: string;
+  planId?: string;
   planName: string;
   quotaLeft: number;
   quota: number;
@@ -45,6 +54,12 @@ onMounted(async () => {
   me.value = await api("/api/me");
   plans.value = (await api<{ items: typeof plans.value }>("/api/billing/plans")).items;
 });
+
+function isCurrent(p: { id: string; name: string }) {
+  if (!me.value) return false;
+  if (me.value.planId) return p.id === me.value.planId;
+  return p.name === me.value.planName;
+}
 
 async function buy(planId: string) {
   if (!flight.enter(`buy:${planId}`)) return;

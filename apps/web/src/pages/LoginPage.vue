@@ -1,27 +1,30 @@
 <template>
-  <div class="auth-page">
-    <div class="auth-card">
-      <h1>登录一意</h1>
-      <p class="sub">用邮箱写稿，人自己去各站后台粘贴。</p>
-      <div class="field">
-        <label>邮箱</label>
-        <t-input v-model="email" placeholder="you@example.com" @enter="onSubmit" />
-      </div>
-      <div class="field">
-        <label>密码</label>
-        <t-input v-model="password" type="password" placeholder="至少 8 位" @enter="onSubmit" />
-      </div>
-      <t-button theme="primary" block :loading="loading" @click="onSubmit">登录</t-button>
-      <p class="err" v-if="err">{{ err }}</p>
-      <p class="hint" style="margin-top: 16px">没有账号？<router-link to="/register">去注册</router-link></p>
+  <AuthSplit>
+    <h1>登录一意</h1>
+    <p class="sub">使用邮箱登录创作台。成稿由你本人粘贴到各平台后台。</p>
+    <div class="field">
+      <label>
+        邮箱
+        <t-input v-model="email" name="email" autocomplete="username" placeholder="you@example.com" @enter="onSubmit" />
+      </label>
     </div>
-  </div>
+    <div class="field">
+      <label>
+        密码
+        <t-input v-model="password" type="password" name="password" autocomplete="current-password" placeholder="至少 8 位" @enter="onSubmit" />
+      </label>
+    </div>
+    <t-button theme="primary" block :loading="loading" @click="onSubmit">登录</t-button>
+    <p class="err" v-if="err" role="alert">{{ err }}</p>
+    <p class="hint" style="margin-top: 16px">没有账号？<router-link to="/register">去注册</router-link></p>
+  </AuthSplit>
 </template>
 
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../stores/auth";
+import AuthSplit from "../layouts/AuthSplit.vue";
 
 const email = ref("");
 const password = ref("");

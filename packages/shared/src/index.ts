@@ -34,9 +34,9 @@ export const DAG_NODE_LABEL: Record<(typeof DAG_NODES)[number], string> = {
   media: "素材",
   outline: "大纲",
   body: "正文",
-  adapt: "适配",
-  check: "检查",
-  copy: "复制",
+  adapt: "渠道适配",
+  check: "合规检查",
+  copy: "复制发布",
 };
 
 export const PERMISSIONS = [
@@ -66,6 +66,31 @@ export const PERMISSIONS = [
 
 export type PermissionCode = (typeof PERMISSIONS)[number];
 
+export const PERMISSION_LABEL: Record<PermissionCode, { name: string; hint: string }> = {
+  "overview:view": { name: "查看数据概览", hint: "能打开工作台数字" },
+  "user:list": { name: "查看用户", hint: "能打开用户列表" },
+  "user:disable": { name: "停用或启用用户", hint: "停用后用户无法登录 C 端" },
+  "user:reset": { name: "重置用户密码", hint: "立刻作废原密码" },
+  "user:plan": { name: "调整用户套餐", hint: "立刻改额度，不自动扣款" },
+  "article:inspect": { name: "审核作品", hint: "只读抽查成稿" },
+  "plan:edit": { name: "编辑套餐", hint: "改每月篇数或是否上架" },
+  "order:list": { name: "查看订单", hint: "打开订单列表" },
+  "order:refund": { name: "标记退款", hint: "记退款并停该单额度" },
+  "job:retry": { name: "重试生成任务", hint: "仅失败任务可再跑" },
+  "platform:edit": { name: "编辑站点配置", hint: "改站点级配置" },
+  "topic:edit": { name: "编辑内容类目", hint: "改 C 端可见中文名" },
+  "slot:edit": { name: "编辑模型配置", hint: "改接口地址、模型、密钥" },
+  "prompt:edit": { name: "编辑提示词模板", hint: "改大纲或正文指令" },
+  "skill:import": { name: "导入写作技能", hint: "新技能默认待审" },
+  "skill:edit": { name: "审核写作技能", hint: "启用后参与成稿" },
+  "style:edit": { name: "编辑风格预设", hint: "开关 C 端风格" },
+  "mcp:edit": { name: "管理开放接口", hint: "生成或作废令牌" },
+  "site:edit": { name: "编辑站点信息", hint: "站点展示名等" },
+  "role:edit": { name: "编辑角色权限", hint: "改运营能进哪些页" },
+  "audit:view": { name: "查看操作日志", hint: "只读审计" },
+  "admin:edit": { name: "管理运营账号", hint: "给运营赋角色" },
+};
+
 export type Anchor = { id: string; text: string; confirmed: boolean; fromAssetId?: string };
 
 export function confirmedAnchorCount(anchors: Anchor[]): number {
@@ -82,16 +107,16 @@ export function canGenerate(input: {
   ok: boolean;
   reason?: string;
 } {
-  if (!input.subActive) return { ok: false, reason: "订阅已到期，只能看已有稿" };
-  if (input.quotaLeft <= 0) return { ok: false, reason: "本月篇数用完了" };
+  if (!input.subActive) return { ok: false, reason: "订阅已到期，仅可查看已有作品" };
+  if (input.quotaLeft <= 0) return { ok: false, reason: "本月生成额度已用完" };
   if (input.theme !== undefined && input.theme.trim().length < 4) {
-    return { ok: false, reason: "还没写这篇要写什么" };
+    return { ok: false, reason: "请填写至少 4 个字的作品主题" };
   }
   if (input.topicCodes !== undefined && input.topicCodes.length < 1) {
-    return { ok: false, reason: "先选一个大概写哪一类" };
+    return { ok: false, reason: "请选择至少一个内容类目" };
   }
   if (confirmedAnchorCount(input.anchors) < 2) {
-    return { ok: false, reason: "还差一条你亲历过的事" };
+    return { ok: false, reason: "请至少填写两条已确认的事实依据" };
   }
   return { ok: true };
 }
@@ -186,16 +211,16 @@ export function canCopy(input: {
 }
 
 export const topicFormSeed = [
-  { code: "form.long", labelZh: "一篇能发公众号的长文" },
-  { code: "form.note", labelZh: "一组能发小红书的图" },
-  { code: "form.both", labelZh: "两个都要" },
+  { code: "form.long", labelZh: "公众号长文" },
+  { code: "form.note", labelZh: "小红书图文" },
+  { code: "form.both", labelZh: "长文与笔记" },
 ] as const;
 
 export const topicIntentSeed = [
-  { code: "intent.story", labelZh: "把我经历过的事讲清楚" },
-  { code: "intent.howto", labelZh: "教别人一步一步做" },
-  { code: "intent.opinion", labelZh: "说说我的看法" },
-  { code: "intent.promo", labelZh: "安利 / 种草", risk: "advertising" },
+  { code: "intent.story", labelZh: "经历叙述" },
+  { code: "intent.howto", labelZh: "方法教程" },
+  { code: "intent.opinion", labelZh: "观点评论" },
+  { code: "intent.promo", labelZh: "商品推荐", risk: "advertising" },
 ] as const;
 
 export function hitLimiter(
@@ -291,4 +316,36 @@ export function htmlToPlain(html: string): string {
     .replace(/<[^>]+>/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function escapePlain(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Rebuild paste-ready HTML from the plain editor. Keep original <img> in [图] slots. */
+export function plainToHtml(plain: string, originalHtml = ""): string {
+  const imgs = [...originalHtml.matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]);
+  let i = 0;
+  const blocks = plain.replace(/\r\n/g, "\n").trim().split(/\n{2,}/);
+  const parts: string[] = [];
+  for (const block of blocks) {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    if (lines.length === 1 && lines[0] === "[图]") {
+      const img = imgs[i++];
+      if (img) parts.push(`<p>${img}</p>`);
+      continue;
+    }
+    if (!lines.length) continue;
+    parts.push(`<p>${lines.map(escapePlain).join("<br/>")}</p>`);
+  }
+  while (i < imgs.length) {
+    parts.push(`<p>${imgs[i++]}</p>`);
+  }
+  return parts.join("");
+}
+
+export function pasteToPlain(input: { text?: string; html?: string }): string {
+  const text = (input.text || "").replace(/\r\n/g, "\n").trim();
+  if (text) return text;
+  return htmlToPlain(input.html || "");
 }

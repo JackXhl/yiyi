@@ -29,7 +29,7 @@ export class McpController {
 
   @Get("tools")
   async tools(@Headers("authorization") auth?: string) {
-    await this.token(auth);
+    const row = await this.token(auth);
     return { tools: row.tools.length ? row.tools : [...MCP_ALLOWED], note: "无 publish。调用 POST /api/mcp/call，与 C 端同一套锚点门闩。" };
   }
 
@@ -49,10 +49,10 @@ export class McpController {
 
   private async token(auth?: string) {
     const raw = auth?.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!raw) throw new UnauthorizedException("需要运营签发的 MCP 令牌");
+    if (!raw) throw new UnauthorizedException("需要运营生成的访问令牌");
     const hash = createHash("sha256").update(raw).digest("hex");
     const row = await this.prisma.mcpToken.findUnique({ where: { tokenHash: hash } });
-    if (!row?.enabled) throw new UnauthorizedException("令牌无效或已吊销");
+    if (!row?.enabled) throw new UnauthorizedException("令牌无效或已作废");
     if (!hitLimiter(mcpHits, hash.slice(0, 16), 30, 60_000)) {
       throw new HttpException("请稍后再试", 429);
     }
@@ -61,7 +61,7 @@ export class McpController {
 
   private async readArticle(id: string) {
     const article = await this.prisma.article.findUnique({ where: { id } });
-    if (!article) throw new BadRequestException("找不到这篇稿");
+    if (!article) throw new BadRequestException("找不到这篇作品");
     return {
       id: article.id,
       theme: article.theme,
@@ -72,13 +72,13 @@ export class McpController {
   }
 
   private async addAnchor(id: string, text: string) {
-    if (text.trim().length < 4) throw new BadRequestException("还差一条你亲历过的事");
+    if (text.trim().length < 4) throw new BadRequestException("这一条事实依据至少要 4 个字");
     if (text.trim().length > 2000) throw new BadRequestException("这一条太长了");
     const article = await this.prisma.article.findUnique({ where: { id } });
-    if (!article) throw new BadRequestException("找不到这篇稿");
+    if (!article) throw new BadRequestException("找不到这篇作品");
     const anchors = ([...(article.anchors as Anchor[])] || []) as Anchor[];
     const empty = anchors.find((a) => !a.text.trim());
-    if (anchors.length >= 8 && !empty) throw new BadRequestException("锚点最多 8 条");
+    if (anchors.length >= 8 && !empty) throw new BadRequestException("事实依据最多 8 条");
     if (empty) {
       empty.text = text.trim();
       empty.confirmed = true;
@@ -124,7 +124,7 @@ export class McpController {
 
   private async trigger(id: string) {
     const article = await this.prisma.article.findUnique({ where: { id } });
-    if (!article) throw new BadRequestException("找不到这篇稿");
+    if (!article) throw new BadRequestException("找不到这篇作品");
     await this.generate.run(id, article.userId);
     return { ok: true };
   }

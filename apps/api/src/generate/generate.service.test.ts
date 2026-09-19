@@ -74,9 +74,25 @@ describe("layout", () => {
     expect(html).toContain("/uploads/a.jpg");
   });
 
-  it("falls back when the model returns almost nothing", () => {
-    const html = longHtmlFromProse("短", "换灯管", anchors, [], buildLayout([]));
-    expect(html).toContain("上周三晚上店里灯管一直闪");
+  it("strips tags from model text", () => {
     expect(stripModelText("<p>现场</p>")).toBe("现场");
+  });
+
+  it("falls back when the model returns a short filler line", () => {
+    const html = longHtmlFromProse("好的我知道了谢谢", "换灯管", anchors, [], buildLayout([]));
+    expect(html).toContain("上周三晚上店里灯管一直闪");
+    expect(html).not.toContain("好的我知道了谢谢");
+  });
+
+  it("keeps a short but real model sentence instead of the template", () => {
+    const html = longHtmlFromProse(
+      "我周三晚上在店里更换了闪动的灯管，换完后前台的灯不再闪烁。",
+      "换灯管",
+      anchors,
+      [],
+      buildLayout([]),
+    );
+    expect(html).toContain("前台的灯不再闪烁");
+    expect(html).not.toContain("以上都是我自己碰到的事");
   });
 });

@@ -8,7 +8,7 @@
 2. `pnpm install`
 3. `pnpm db:migrate` 然后 `pnpm db:seed`
 4. `pnpm dev`
-5. C 端 http://localhost:5173 　运营端 http://localhost:5174 　API http://localhost:3000/api
+5. C 端 http://127.0.0.1:18473 　控制台 http://127.0.0.1:18474 　API http://127.0.0.1:18470/api
 
 运营默认账号见 `.env` 的 `ADMIN_EMAIL` / `ADMIN_PASSWORD`。
 

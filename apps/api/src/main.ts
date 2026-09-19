@@ -13,11 +13,16 @@ async function bootstrap() {
   app.setGlobalPrefix("api");
   app.useGlobalFilters(new AllFilter());
   app.enableCors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      "http://localhost:18473",
+      "http://localhost:18474",
+      "http://127.0.0.1:18473",
+      "http://127.0.0.1:18474",
+    ],
     credentials: true,
   });
   app.useStaticAssets(join(process.cwd(), "uploads"), { prefix: "/uploads/" });
-  const port = Number(process.env.PORT || 3000);
+  const port = Number(process.env.PORT || 18470);
   await app.listen(port);
   console.log(`yiyi api http://localhost:${port}/api`);
 }
