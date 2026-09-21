@@ -26,7 +26,7 @@
     </template>
     <el-empty v-if="!paged.length" description="没有匹配的类目。" />
     <el-table v-else :data="paged">
-      <el-table-column width="160">
+      <el-table-column min-width="160">
         <template #header><ColTitle label="内部编号" tip="系统识别码，请勿修改" /></template>
         <template #default="{ row }">{{ row.code }}</template>
       </el-table-column>
@@ -34,11 +34,11 @@
         <template #header><ColTitle label="中文名称" tip="C 端展示文案" /></template>
         <template #default="{ row }">{{ row.labelZh }}</template>
       </el-table-column>
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="所属维度" tip="体裁 / 意图 / 类目" /></template>
         <template #default="{ row }">{{ AXIS_LABEL[row.axis] || row.axis }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="对用户展示" /></template>
         <template #default="{ row }">{{ row.enabled ? "展示" : "隐藏" }}</template>
       </el-table-column>

@@ -39,6 +39,60 @@ export const DAG_NODE_LABEL: Record<(typeof DAG_NODES)[number], string> = {
   copy: "复制发布",
 };
 
+export const DAG_PHASES = ["fill", "draft", "copy"] as const;
+export const DAG_RUN_MODES = ["ai_then_human", "ai_auto", "human_approve"] as const;
+export type DagPhase = (typeof DAG_PHASES)[number];
+export type DagRunMode = (typeof DAG_RUN_MODES)[number];
+export type DagNodeId = (typeof DAG_NODES)[number];
+
+export const DAG_RUN_MODE_LABEL: Record<DagRunMode, string> = {
+  ai_then_human: "AI + 人工审批",
+  ai_auto: "AI 自动",
+  human_approve: "人工（本人粘贴）",
+};
+
+export const DAG_PHASE_LABEL: Record<DagPhase, string> = {
+  fill: "取材",
+  draft: "成稿",
+  copy: "取稿",
+};
+
+export type DagNodeConfigSeed = {
+  node: DagNodeId;
+  phase: DagPhase;
+  sort: number;
+  runMode: DagRunMode;
+  contextCheck: boolean;
+  contentCheck: boolean;
+};
+
+export const DAG_NODE_CONFIG_SEED: readonly DagNodeConfigSeed[] = [
+  { node: "topic", phase: "fill", sort: 1, runMode: "ai_then_human", contextCheck: false, contentCheck: true },
+  { node: "media", phase: "fill", sort: 2, runMode: "ai_then_human", contextCheck: true, contentCheck: true },
+  { node: "outline", phase: "draft", sort: 3, runMode: "ai_auto", contextCheck: true, contentCheck: true },
+  { node: "body", phase: "draft", sort: 4, runMode: "ai_auto", contextCheck: true, contentCheck: true },
+  { node: "adapt", phase: "draft", sort: 5, runMode: "ai_auto", contextCheck: true, contentCheck: true },
+  { node: "check", phase: "copy", sort: 6, runMode: "ai_auto", contextCheck: true, contentCheck: true },
+  { node: "copy", phase: "copy", sort: 7, runMode: "human_approve", contextCheck: false, contentCheck: false },
+] as const;
+
+export const AI_JOB_NODES = ["outline", "body", "adapt", "check"] as const;
+
+export function canSetNodeRunMode(node: string, runMode: string): { ok: boolean; reason?: string } {
+  if (node === "copy" && runMode === "ai_auto") {
+    return { ok: false, reason: "复制不能改成自动发表" };
+  }
+  if ((AI_JOB_NODES as readonly string[]).includes(node) && runMode !== "ai_auto") {
+    return { ok: false, reason: "成稿节点本版本必须 AI 自动" };
+  }
+  if (!(DAG_NODES as readonly string[]).includes(node)) return { ok: false, reason: "未知节点" };
+  if (!(DAG_RUN_MODES as readonly string[]).includes(runMode)) return { ok: false, reason: "未知运行模式" };
+  return { ok: true };
+}
+
+export const COPY_NOTICE =
+  "请在各站后台按平台规则声明生成合成内容。商品推荐须同时注意广告标识。本产品不代为发表。";
+
 export const PERMISSIONS = [
   "overview:view",
   "user:list",
@@ -93,8 +147,25 @@ export const PERMISSION_LABEL: Record<PermissionCode, { name: string; hint: stri
 
 export type Anchor = { id: string; text: string; confirmed: boolean; fromAssetId?: string };
 
+export function confirmedAnchors(anchors: Anchor[]): Anchor[] {
+  return anchors.filter((a) => a.confirmed && a.text.trim().length >= 4);
+}
+
 export function confirmedAnchorCount(anchors: Anchor[]): number {
-  return anchors.filter((a) => a.confirmed && a.text.trim().length >= 4).length;
+  return confirmedAnchors(anchors).length;
+}
+
+export function textCoversAnchors(text: string, anchors: Anchor[]): boolean {
+  const hay = text.replace(/\s+/g, "");
+  return confirmedAnchors(anchors).every((a) => {
+    const needle = a.text.trim().replace(/\s+/g, "");
+    if (!needle) return true;
+    if (needle.length <= 8) return hay.includes(needle);
+    for (let i = 0; i <= needle.length - 8; i++) {
+      if (hay.includes(needle.slice(i, i + 8))) return true;
+    }
+    return false;
+  });
 }
 
 export function canGenerate(input: {
@@ -200,13 +271,8 @@ export function acceptAssetFile(file: { mimetype: string; size: number }): strin
   return null;
 }
 
-export function canCopy(input: {
-  disclosureAck: boolean;
-  highRisk: boolean;
-  highRiskAck: boolean;
-}): { ok: boolean; reason?: string } {
-  if (!input.disclosureAck) return { ok: false, reason: "请先勾选：已按平台规则做 AI 生成声明" };
-  if (input.highRisk && !input.highRiskAck) return { ok: false, reason: "高风险项需勾选「已知晓仍复制」" };
+export function canCopy(input: { status: string }): { ok: boolean; reason?: string } {
+  if (input.status !== "ready") return { ok: false, reason: "成稿完成后才能复制" };
   return { ok: true };
 }
 
@@ -246,6 +312,9 @@ export class InFlight {
     if (this.keys.has(key)) return false;
     this.keys.add(key);
     return true;
+  }
+  has(key: string) {
+    return this.keys.has(key);
   }
   leave(key: string) {
     this.keys.delete(key);

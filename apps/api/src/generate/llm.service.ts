@@ -19,6 +19,7 @@ export class LlmService {
       // AI SDK v5 默认走 /v1/responses；百炼兼容模式只稳 chat/completions。
       const { text } = await generateText({
         model: openai.chat(row.model),
+        abortSignal: AbortSignal.timeout(120_000),
         ...(image
           ? {
               messages: [

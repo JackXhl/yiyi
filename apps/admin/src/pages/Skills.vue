@@ -21,11 +21,11 @@
         <template #header><ColTitle label="技能名称" /></template>
         <template #default="{ row }">{{ row.name }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="审核状态" /></template>
         <template #default="{ row }">{{ row.reviewed ? "已审核" : "待审核" }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="是否启用" /></template>
         <template #default="{ row }">{{ row.enabled ? "启用" : "未启用" }}</template>
       </el-table-column>

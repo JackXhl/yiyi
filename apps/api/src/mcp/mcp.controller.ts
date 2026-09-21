@@ -76,6 +76,7 @@ export class McpController {
     if (text.trim().length > 2000) throw new BadRequestException("这一条太长了");
     const article = await this.prisma.article.findUnique({ where: { id } });
     if (!article) throw new BadRequestException("找不到这篇作品");
+    if (article.status === "generating") throw new ForbiddenException("正在写，请稍等");
     const anchors = ([...(article.anchors as Anchor[])] || []) as Anchor[];
     const empty = anchors.find((a) => !a.text.trim());
     if (anchors.length >= 8 && !empty) throw new BadRequestException("事实依据最多 8 条");
@@ -92,6 +93,9 @@ export class McpController {
   private async upsert(args: Record<string, unknown>) {
     const id = String(args.id || "");
     if (id) {
+      const existing = await this.prisma.article.findUnique({ where: { id } });
+      if (!existing) throw new BadRequestException("找不到这篇作品");
+      if (existing.status === "generating") throw new ForbiddenException("正在写，请稍等");
       await this.prisma.article.update({
         where: { id },
         data: {

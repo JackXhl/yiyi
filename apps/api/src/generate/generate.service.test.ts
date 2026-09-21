@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { canGenerate, type Anchor } from "@yiyi/shared";
 import {
   buildLayout,
+  jobNodesFromConfig,
   longHtmlFromProse,
   longHtmlWithImages,
   machineCheck,
   noteTextWithOrder,
   orderImages,
+  ownedLayout,
+  stripClicheSentences,
   stripModelText,
 } from "./generate.service";
 
@@ -94,5 +97,36 @@ describe("layout", () => {
     );
     expect(html).toContain("前台的灯不再闪烁");
     expect(html).not.toContain("以上都是我自己碰到的事");
+  });
+
+  it("strips cliche sentences before using model prose", () => {
+    expect(stripClicheSentences("灯管闪了。不仅如此。客人说亮了。")).toBe("灯管闪了。客人说亮了。");
+  });
+
+  it("drops layout ids that are not this article's images", () => {
+    const assets = [{ id: "img1", kind: "image", path: "a.jpg", analysis: null }];
+    const layout = ownedLayout(
+      {
+        long: { coverId: "gone", slots: [{ assetId: "gone", caption: "" }, { assetId: "img1", caption: "灯" }] },
+        note: { order: ["gone", "img1"] },
+      },
+      assets,
+    );
+    expect(layout.note.order).toEqual(["img1"]);
+    expect(layout.long.coverId).toBe("img1");
+  });
+
+  it("flags missing confirmed facts in the check list", () => {
+    const issues = machineCheck("<p>随便写两句现场。</p>", "intent.story", anchors, 0);
+    expect(issues.some((i) => i.text.includes("未写进成稿"))).toBe(true);
+  });
+
+  it("always runs the four job nodes even if the config table is partial", () => {
+    expect(jobNodesFromConfig([]).map((n) => n.node)).toEqual(["outline", "body", "adapt", "check"]);
+    expect(
+      jobNodesFromConfig([
+        { node: "body", runMode: "ai_auto", contextCheck: true, contentCheck: true },
+      ]).map((n) => n.node),
+    ).toEqual(["outline", "body", "adapt", "check"]);
   });
 });

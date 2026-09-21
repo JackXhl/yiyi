@@ -69,7 +69,9 @@ export class ArticlesController {
   @Patch(":id")
   async patch(@Req() req: { user: { sub: string } }, @Param("id") id: string, @Body() raw: unknown) {
     const body = articlePatchSchema.parse(raw);
-    await this.owned(id, req.user.sub);
+    await this.generate.releaseStale(id, req.user.sub);
+    const article = await this.owned(id, req.user.sub);
+    if (article.status === "generating") throw new ForbiddenException("正在写，请稍等");
     await this.prisma.article.update({
       where: { id },
       data: {
@@ -95,22 +97,14 @@ export class ArticlesController {
   @Post(":id/generate")
   async run(@Req() req: { user: { sub: string } }, @Param("id") id: string) {
     await this.owned(id, req.user.sub);
-    await this.generate.run(id, req.user.sub);
+    await this.generate.enqueue(id, req.user.sub);
     return this.detailPayload(id, req.user.sub);
   }
 
   @Get(":id/copy-pack")
   async copyPack(@Req() req: { user: { sub: string } }, @Param("id") id: string) {
     const article = await this.owned(id, req.user.sub);
-    const anchors = (article.anchors as Anchor[]) ?? [];
-    const highRisk =
-      article.intentCode === "intent.promo" ||
-      JSON.stringify(article.checkReport).includes("high");
-    const gate = canCopy({
-      disclosureAck: article.disclosureAck,
-      highRisk,
-      highRiskAck: article.highRiskAck,
-    });
+    const gate = canCopy({ status: article.status });
     if (!gate.ok) throw new ForbiddenException(gate.reason);
     const assets = await this.prisma.asset.findMany({
       where: { articleId: id },
@@ -147,6 +141,7 @@ export class ArticlesController {
   }
 
   private async detailPayload(id: string, userId: string) {
+    await this.generate.releaseStale(id, userId);
     const article = await this.owned(id, userId);
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },

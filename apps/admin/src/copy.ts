@@ -21,6 +21,7 @@ export const MENU: MenuNode[] = [
     title: "内容引擎",
     children: [
       { path: "/jobs", title: "生成任务" },
+      { path: "/dag-nodes", title: "阶段节点" },
       { path: "/topics", title: "内容类目" },
       { path: "/slots", title: "模型配置" },
       { path: "/prompts", title: "提示词模板" },
@@ -45,6 +46,7 @@ export const ROUTE_PERM: Record<string, string> = {
   "/plans": "plan:edit",
   "/orders": "order:list",
   "/jobs": "job:retry",
+  "/dag-nodes": "prompt:edit",
   "/topics": "topic:edit",
   "/slots": "slot:edit",
   "/prompts": "prompt:edit",
@@ -113,9 +115,13 @@ export const AXIS_LABEL: Record<string, string> = {
 };
 
 export const NODE_LABEL: Record<string, string> = {
+  topic: "选题",
+  media: "素材",
   outline: "大纲",
   body: "正文",
+  adapt: "渠道适配",
   check: "合规检查",
+  copy: "复制发布",
 };
 
 export function fenToYuan(fen: number) {

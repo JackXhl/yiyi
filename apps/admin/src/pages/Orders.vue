@@ -19,11 +19,11 @@
         <template #header><ColTitle label="用户邮箱" tip="下单的 C 端账号" /></template>
         <template #default="{ row }">{{ row.user?.email || "—" }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="金额（元）" tip="已从分换算" /></template>
         <template #default="{ row }">{{ fenToYuan(row.amountFen) }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="订单状态" /></template>
         <template #default="{ row }">{{ ORDER_STATUS[row.status] || row.status }}</template>
       </el-table-column>

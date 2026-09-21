@@ -15,7 +15,7 @@ import {
 import * as bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "node:crypto";
 import { JwtService } from "@nestjs/jwt";
-import { credentialsSchema, hitLimiter, PERMISSIONS } from "@yiyi/shared";
+import { credentialsSchema, canSetNodeRunMode, hitLimiter, PERMISSIONS } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
 import { GenerateService } from "../generate/generate.service.js";
 import { AdminOnly, Public } from "../auth/public.js";
@@ -190,7 +190,9 @@ export class AdminController {
   async retry(@Req() req: AdminReq, @Param("id") id: string) {
     await this.assertPerm(req.user.sub, "job:retry");
     const job = await this.prisma.generationJob.findUniqueOrThrow({ where: { id } });
+    if (job.status !== "failed") throw new ForbiddenException("只能重试失败任务");
     const article = await this.prisma.article.findUniqueOrThrow({ where: { id: job.articleId } });
+    if (article.status === "generating") throw new ForbiddenException("正在写，请稍等");
     await this.generate.run(article.id, article.userId);
     await this.prisma.generationJob.update({ where: { id }, data: { status: "done" } });
     return { ok: true };
@@ -246,6 +248,33 @@ export class AdminController {
     return this.prisma.promptTemplate.update({
       where: { id },
       data: { ...(body.body != null ? { body: body.body, version: { increment: 1 } } : {}) },
+    });
+  }
+
+  @Get("dag-nodes")
+  async dagNodes(@Req() req: AdminReq) {
+    await this.assertPerm(req.user.sub, "prompt:edit");
+    return this.prisma.dagNodeConfig.findMany({ orderBy: { sort: "asc" } });
+  }
+
+  @Patch("dag-nodes/:node")
+  async patchDagNode(
+    @Req() req: AdminReq,
+    @Param("node") node: string,
+    @Body() body: { runMode?: string; contextCheck?: boolean; contentCheck?: boolean },
+  ) {
+    await this.assertPerm(req.user.sub, "prompt:edit");
+    if (body.runMode) {
+      const gate = canSetNodeRunMode(node, body.runMode);
+      if (!gate.ok) throw new ForbiddenException(gate.reason);
+    }
+    return this.prisma.dagNodeConfig.update({
+      where: { node },
+      data: {
+        ...(body.runMode != null ? { runMode: body.runMode } : {}),
+        ...(body.contextCheck != null ? { contextCheck: body.contextCheck } : {}),
+        ...(body.contentCheck != null ? { contentCheck: body.contentCheck } : {}),
+      },
     });
   }
 

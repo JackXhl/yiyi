@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Inject,
   Param,
   Post,
@@ -18,13 +19,23 @@ import { extname, join } from "node:path";
 import { ALLOWED_ASSET_MIME, acceptAssetFile } from "@yiyi/shared";
 import { PrismaService } from "../prisma.service.js";
 import { LlmService } from "../generate/llm.service.js";
+import { GenerateService } from "../generate/generate.service.js";
 
 @Controller("articles/:id/assets")
 export class AssetsController {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(LlmService) private readonly llm: LlmService,
+    @Inject(GenerateService) private readonly generate: GenerateService,
   ) {}
+
+  private async writable(id: string, userId: string) {
+    await this.generate.releaseStale(id, userId);
+    const article = await this.prisma.article.findFirst({ where: { id, userId } });
+    if (!article) throw new BadRequestException("找不到这篇稿");
+    if (article.status === "generating") throw new ForbiddenException("正在写，请稍等");
+    return article;
+  }
 
   @Post()
   @UseInterceptors(
@@ -44,8 +55,7 @@ export class AssetsController {
     @Param("id") id: string,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    const article = await this.prisma.article.findFirst({ where: { id, userId: req.user.sub } });
-    if (!article) throw new BadRequestException("找不到这篇稿");
+    await this.writable(id, req.user.sub);
     const existing = await this.prisma.asset.findMany({ where: { articleId: id } });
     const incoming = files ?? [];
     if (!incoming.length) throw new BadRequestException("只收照片或 MP4 短视频");
@@ -88,8 +98,7 @@ export class AssetsController {
     @Param("id") id: string,
     @Body() body: { ids: string[] },
   ) {
-    const article = await this.prisma.article.findFirst({ where: { id, userId: req.user.sub } });
-    if (!article) throw new BadRequestException("找不到这篇稿");
+    await this.writable(id, req.user.sub);
     const ids = (body.ids ?? []).slice(0, 9).filter((id) => typeof id === "string" && id.length > 0 && id.length <= 64);
     await this.prisma.$transaction(
       ids.map((assetId, sort) =>
@@ -106,6 +115,7 @@ export class AssetsController {
     @Param("assetId") assetId: string,
     @Body() body: { asAnchor?: boolean },
   ) {
+    await this.writable(id, req.user.sub);
     const asset = await this.prisma.asset.findFirst({
       where: { id: assetId, article: { id, userId: req.user.sub } },
     });

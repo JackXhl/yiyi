@@ -14,11 +14,11 @@
   >
     <el-empty v-if="!paged.length" description="还没有提示词模板。请先执行数据库初始化。" />
     <el-table v-else :data="paged">
-      <el-table-column width="120">
+      <el-table-column min-width="120">
         <template #header><ColTitle label="节点" tip="大纲或正文" /></template>
         <template #default="{ row }">{{ NODE_LABEL[row.node] || row.node }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="适用范围" tip="空表示全平台" /></template>
         <template #default="{ row }">{{ row.platform || "全部渠道" }}</template>
       </el-table-column>
@@ -26,7 +26,7 @@
         <template #header><ColTitle label="指令摘要" /></template>
         <template #default="{ row }">{{ row.body.slice(0, 48) }}{{ row.body.length > 48 ? "…" : "" }}</template>
       </el-table-column>
-      <el-table-column width="80">
+      <el-table-column min-width="96">
         <template #header><ColTitle label="版本" tip="每保存一次加一" /></template>
         <template #default="{ row }">{{ row.version }}</template>
       </el-table-column>

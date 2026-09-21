@@ -15,6 +15,10 @@ import {
   htmlToPlain,
   pasteToPlain,
   plainToHtml,
+  DAG_NODE_CONFIG_SEED,
+  AI_JOB_NODES,
+  canSetNodeRunMode,
+  textCoversAnchors,
 } from "./index";
 
 describe("canGenerate", () => {
@@ -123,13 +127,41 @@ describe("sanitize and upload", () => {
 });
 
 describe("canCopy", () => {
-  it("requires disclosure ack", () => {
-    expect(canCopy({ disclosureAck: false, highRisk: false, highRiskAck: false }).ok).toBe(false);
+  it("allows copy once the article is ready", () => {
+    expect(canCopy({ status: "draft" }).ok).toBe(false);
+    expect(canCopy({ status: "generating" }).ok).toBe(false);
+    expect(canCopy({ status: "failed" }).ok).toBe(false);
+    expect(canCopy({ status: "ready" }).ok).toBe(true);
+  });
+});
+
+describe("dag node config", () => {
+  it("seeds seven nodes with fill as human gate and later as ai auto", () => {
+    expect(DAG_NODE_CONFIG_SEED).toHaveLength(7);
+    expect(DAG_NODE_CONFIG_SEED.filter((r) => r.phase === "fill").every((r) => r.runMode === "ai_then_human")).toBe(true);
+    expect(AI_JOB_NODES.every((n) => DAG_NODE_CONFIG_SEED.find((r) => r.node === n)?.runMode === "ai_auto")).toBe(true);
+    expect(DAG_NODE_CONFIG_SEED.find((r) => r.node === "copy")?.runMode).toBe("human_approve");
   });
 
-  it("requires extra ack when high risk", () => {
-    expect(canCopy({ disclosureAck: true, highRisk: true, highRiskAck: false }).ok).toBe(false);
-    expect(canCopy({ disclosureAck: true, highRisk: true, highRiskAck: true }).ok).toBe(true);
+  it("forbids copy auto-publish", () => {
+    expect(canSetNodeRunMode("copy", "ai_auto").ok).toBe(false);
+    expect(canSetNodeRunMode("outline", "ai_then_human").ok).toBe(false);
+    expect(canSetNodeRunMode("outline", "ai_auto").ok).toBe(true);
+  });
+
+  it("checks that draft text still contains confirmed anchors", () => {
+    const anchors = [
+      { id: "1", text: "上周三晚上店里灯管一直闪", confirmed: true },
+      { id: "2", text: "我自己爬梯子换了灯管", confirmed: true },
+    ];
+    expect(textCoversAnchors("上周三晚上店里灯管一直闪。我自己爬梯子换了灯管。", anchors)).toBe(true);
+    expect(textCoversAnchors("灯管坏了", anchors)).toBe(false);
+    expect(
+      textCoversAnchors("上周三晚上店里灯管一直闪。我自己爬梯子换了灯管。今天客人又来了。", [
+        { id: "1", text: "上周三晚上店里灯管一直闪，客人说看菜单费劲", confirmed: true },
+        { id: "2", text: "我自己爬梯子换了灯管，换完前台不再闪", confirmed: true },
+      ]),
+    ).toBe(true);
   });
 });
 
@@ -157,7 +189,9 @@ describe("InFlight", () => {
     expect(lock.enter("art1")).toBe(true);
     expect(lock.enter("art1")).toBe(false);
     expect(lock.enter("art2")).toBe(true);
+    expect(lock.has("art1")).toBe(true);
     lock.leave("art1");
+    expect(lock.has("art1")).toBe(false);
     expect(lock.enter("art1")).toBe(true);
   });
 });

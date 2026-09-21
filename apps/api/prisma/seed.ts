@@ -1,7 +1,7 @@
 import "../src/load-env.js";
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { PERMISSIONS } from "@yiyi/shared";
+import { DAG_NODE_CONFIG_SEED, PERMISSIONS } from "@yiyi/shared";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -29,7 +29,7 @@ async function main() {
   const adminPass = process.env.ADMIN_PASSWORD || "yiyi-admin-change-me";
   const admin = await prisma.adminUser.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: { passwordHash: await bcrypt.hash(adminPass, 10), disabled: false },
     create: { email: adminEmail, passwordHash: await bcrypt.hash(adminPass, 10) },
   });
   await prisma.adminRole.upsert({
@@ -167,6 +167,17 @@ async function main() {
         { node: "outline", body: "用用户锚点排背景-发生-结果-边界，不写金句。" },
         { node: "body", body: "只写已确认事实。禁止编造对话和数字。不要输出 HTML。分段写，一段一事，每条事实至少一段。" },
       ],
+    });
+  }
+
+  for (const row of DAG_NODE_CONFIG_SEED) {
+    await prisma.dagNodeConfig.upsert({
+      where: { node: row.node },
+      update: {
+        phase: row.phase,
+        sort: row.sort,
+      },
+      create: { ...row },
     });
   }
 

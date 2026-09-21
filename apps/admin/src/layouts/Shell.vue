@@ -20,8 +20,8 @@
         </template>
       </el-menu>
     </el-aside>
-    <el-container>
-      <header class="admin-header">
+    <el-container class="admin-body" direction="vertical">
+      <el-header class="admin-header" height="50px">
         <el-button :icon="collapsed ? Expand : Fold" circle @click="collapsed = !collapsed" />
         <el-breadcrumb separator="/">
           <el-breadcrumb-item>控制台</el-breadcrumb-item>
@@ -31,7 +31,7 @@
         <el-button :icon="FullScreen" circle @click="toggleFull" />
         <span class="who">{{ email }}</span>
         <el-button type="primary" link @click="logout">退出登录</el-button>
-      </header>
+      </el-header>
       <div class="tags-view">
         <span
           v-for="t in tags"

@@ -18,15 +18,15 @@
         <template #header><ColTitle label="套餐名称" tip="对用户展示的名称" /></template>
         <template #default="{ row }">{{ row.name }}</template>
       </el-table-column>
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="每月篇数" tip="每个自然月可生成的次数" /></template>
         <template #default="{ row }">{{ row.monthlyQuota }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="价格（元）" tip="系统按分存储，这里已换算" /></template>
         <template #default="{ row }">{{ fenToYuan(row.priceFen) }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="是否上架" tip="关闭后用户无法新购" /></template>
         <template #default="{ row }">{{ row.enabled ? "上架" : "下架" }}</template>
       </el-table-column>

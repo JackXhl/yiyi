@@ -8,7 +8,7 @@
 | [02-ia-rbac.md](02-ia-rbac.md) | C 端 / 运营端信息架构与权限码 |
 | [03-ui.md](03-ui.md) | C 端 UI token、逐屏、反 AI 味 |
 | [04-agent-runtime.md](04-agent-runtime.md) | Nest DAG + Vercel AI SDK Core |
-| [05-review-gates.md](05-review-gates.md) | 两道硬门、大纲可跳过、禁止评审 loop |
+| [05-review-gates.md](05-review-gates.md) | 硬门 1、闭作业、禁止评审 loop、复制无勾选 |
 | [06-craft-voice.md](06-craft-voice.md) | 用户当记者、一次删减、禁止过检测 |
 | [07-style.md](07-style.md) | 默认系统风格、权利标记 |
 | [08-taxonomy.md](08-taxonomy.md) | 四轴、白话选项、营销可识别 |

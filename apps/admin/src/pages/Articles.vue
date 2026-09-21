@@ -36,7 +36,7 @@
         <template #header><ColTitle label="作品标题" tip="用户主题或生成标题" /></template>
         <template #default="{ row }">{{ row.title || "未命名" }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="120">
         <template #header><ColTitle label="状态" tip="草稿 / 生成中 / 已成稿 / 失败" /></template>
         <template #default="{ row }">{{ ARTICLE_STATUS[row.status] || row.status }}</template>
       </el-table-column>

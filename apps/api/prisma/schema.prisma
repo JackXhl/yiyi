@@ -199,6 +199,16 @@ model GenerationJob {
   createdAt DateTime @default(now())
 }
 
+model DagNodeConfig {
+  node         String   @id
+  phase        String
+  sort         Int
+  runMode      String
+  contextCheck Boolean  @default(true)
+  contentCheck Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+}
+
 model SiteConfig {
   id    String @id @default("default")
   json  Json   @default("{}")

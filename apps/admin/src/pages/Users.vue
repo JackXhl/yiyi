@@ -25,22 +25,22 @@
     </template>
     <el-empty v-if="!paged.length" description="还没有用户。C 端完成注册后会显示在这里。" />
     <el-table v-else :data="paged">
-      <el-table-column prop="email" min-width="200">
+      <el-table-column prop="email" min-width="220">
         <template #header><ColTitle label="用户邮箱" tip="C 端登录邮箱" /></template>
       </el-table-column>
-      <el-table-column width="180">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="当前套餐" tip="修改后立即生效，不自动扣款" /></template>
         <template #default="{ row }">{{ row.planName || "未分配" }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="110">
         <template #header><ColTitle label="作品数" tip="该用户创建的作品总数" /></template>
         <template #default="{ row }">{{ row.articles }}</template>
       </el-table-column>
-      <el-table-column width="90">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="账号状态" tip="停用后无法登录 C 端" /></template>
         <template #default="{ row }">{{ row.disabled ? "已停用" : "正常" }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="280">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button size="small" @click="openPlan(row)">调整套餐</el-button>
           <el-popconfirm

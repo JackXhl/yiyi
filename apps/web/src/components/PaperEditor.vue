@@ -2,11 +2,13 @@
   <div
     ref="root"
     class="paper-editor"
-    contenteditable="true"
+    :class="{ locked }"
+    :contenteditable="locked ? 'false' : 'true'"
     role="textbox"
     aria-multiline="true"
     aria-label="长文"
-    @focus="focused = true"
+    :aria-readonly="locked"
+    @focus="onFocus"
     @blur="onBlur"
     @input="onInput"
     @paste="onPaste"
@@ -17,7 +19,7 @@
 import { nextTick, onMounted, ref, watch } from "vue";
 import { htmlToPlain, pasteToPlain, plainToHtml, sanitizeArticleHtml } from "@yiyi/shared";
 
-const props = defineProps<{ modelValue: string; originalHtml?: string }>();
+const props = defineProps<{ modelValue: string; originalHtml?: string; locked?: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
 const root = ref<HTMLElement | null>(null);
@@ -38,8 +40,13 @@ watch(
   () => paint(),
 );
 
+function onFocus() {
+  if (props.locked) return;
+  focused.value = true;
+}
+
 function onInput() {
-  if (!root.value) return;
+  if (!root.value || props.locked) return;
   emit("update:modelValue", htmlToPlain(root.value.innerHTML));
 }
 
@@ -50,6 +57,7 @@ function onBlur() {
 
 function onPaste(ev: ClipboardEvent) {
   ev.preventDefault();
+  if (props.locked) return;
   const plain = pasteToPlain({
     text: ev.clipboardData?.getData("text/plain"),
     html: ev.clipboardData?.getData("text/html"),

@@ -14,7 +14,7 @@
   >
     <el-empty v-if="!paged.length" description="还没有风格预设。" />
     <el-table v-else :data="paged">
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="内部编号" tip="系统识别码" /></template>
         <template #default="{ row }">{{ row.code }}</template>
       </el-table-column>
@@ -22,11 +22,11 @@
         <template #header><ColTitle label="展示名称" tip="C 端芯片文案" /></template>
         <template #default="{ row }">{{ row.labelZh }}</template>
       </el-table-column>
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="权利来源" tip="system / 授权 / 公有领域 / 用户样本" /></template>
         <template #default="{ row }">{{ rightsLabel(row.rights) }}</template>
       </el-table-column>
-      <el-table-column width="100">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="是否启用" /></template>
         <template #default="{ row }">{{ row.enabled ? "启用" : "停用" }}</template>
       </el-table-column>

@@ -28,11 +28,11 @@
     </template>
     <el-empty v-if="!paged.length" description="还没有生成任务。" />
     <el-table v-else :data="paged">
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="节点" tip="成稿流水中的步骤" /></template>
         <template #default="{ row }">{{ NODE_LABEL[row.node] || row.node }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="120">
         <template #header><ColTitle label="状态" /></template>
         <template #default="{ row }">{{ JOB_STATUS[row.status] || row.status }}</template>
       </el-table-column>

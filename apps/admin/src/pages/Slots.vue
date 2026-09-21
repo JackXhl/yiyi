@@ -14,7 +14,7 @@
   >
     <el-empty v-if="!paged.length" description="还没有能力配置。点击修改即可写入三项能力。" />
     <el-table v-else :data="paged">
-      <el-table-column width="140">
+      <el-table-column min-width="140">
         <template #header><ColTitle label="能力类型" tip="长文 / 大纲 / 视觉" /></template>
         <template #default="{ row }">{{ SLOT_LABEL[row.slot] || row.slot }}</template>
       </el-table-column>
@@ -22,11 +22,11 @@
         <template #header><ColTitle label="接口地址" tip="OpenAI 兼容模式的根地址" /></template>
         <template #default="{ row }">{{ row.baseUrl || "未填写" }}</template>
       </el-table-column>
-      <el-table-column width="160">
+      <el-table-column min-width="160">
         <template #header><ColTitle label="模型标识" tip="如 qwen-turbo" /></template>
         <template #default="{ row }">{{ row.model || "未填写" }}</template>
       </el-table-column>
-      <el-table-column width="120">
+      <el-table-column min-width="128">
         <template #header><ColTitle label="API 密钥" tip="界面只显示是否已保存" /></template>
         <template #default="{ row }">{{ row.apiKey || "未保存" }}</template>
       </el-table-column>

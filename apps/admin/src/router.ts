@@ -17,6 +17,7 @@ const router = createRouter({
         { path: "plans", component: () => import("./pages/Plans.vue") },
         { path: "orders", component: () => import("./pages/Orders.vue") },
         { path: "jobs", component: () => import("./pages/Jobs.vue") },
+        { path: "dag-nodes", component: () => import("./pages/DagNodes.vue") },
         { path: "topics", component: () => import("./pages/Topics.vue") },
         { path: "slots", component: () => import("./pages/Slots.vue") },
         { path: "prompts", component: () => import("./pages/Prompts.vue") },
