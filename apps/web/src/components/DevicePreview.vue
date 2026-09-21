@@ -6,7 +6,7 @@
         <img v-if="cover" class="note-cover" :src="cover" alt="" />
         <div v-else class="note-cover note-cover-demo" />
         <div class="note-meta">
-          <h3>{{ title || "未命名作品" }}</h3>
+          <h3>{{ title || "主题会写在这里" }}</h3>
           <div v-if="tags.length" class="note-tags">
             <span v-for="t in tags" :key="t">{{ t }}</span>
           </div>
@@ -17,7 +17,7 @@
     </div>
     <div v-if="mp" class="mp-sheet">
       <div class="mp-kicker">公众号预览</div>
-      <p v-if="title" class="mp-title">{{ title }}</p>
+      <p class="mp-title">{{ title || "主题会写在这里" }}</p>
       <div v-if="safeLong" class="mp-body" v-html="safeLong" />
       <p v-else class="mp-body">{{ emptyHint || "生成成稿后在这里看长文。" }}</p>
     </div>

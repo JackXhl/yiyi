@@ -5,7 +5,7 @@
     <div class="field">
       <label>
         邮箱
-        <t-input v-model="email" name="email" autocomplete="username" placeholder="you@example.com" @enter="onSubmit" />
+        <t-input v-model="email" name="email" autocomplete="username" placeholder="你的邮箱" @enter="onSubmit" />
       </label>
     </div>
     <div class="field">

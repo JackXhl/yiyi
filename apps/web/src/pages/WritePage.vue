@@ -39,94 +39,111 @@
           <p class="hint" v-if="article.status === 'failed'">生成失败。改取材内容后，再点生成成稿。</p>
 
           <section v-if="phaseId === 'fill'">
-            <p class="hint">确认选题和现场事实后，点底栏生成成稿。后面的大纲、正文、适配由系统一次跑完。</p>
+            <p class="hint">先写下主题和现场事实，再点底栏生成成稿。后面的大纲、正文、适配由系统一次跑完。</p>
             <div class="field">
-              <label>作品体裁</label>
+              <label>主题</label>
+              <t-input v-model="article.theme" placeholder="例如：我把店里那根闪了两周的灯管换了" :disabled="jobLocked" />
+            </div>
+            <div class="field" v-for="(a, i) in article.anchors" :key="a.id">
+              <label>事实 {{ i + 1 }}</label>
+              <t-textarea
+                v-model="a.text"
+                :autosize="{ minRows: 2 }"
+                :placeholder="i === 0 ? '上周三晚上店里灯管一直闪' : '换下来才看见镇流器已经发黑'"
+                :disabled="jobLocked"
+                @change="a.confirmed = a.text.trim().length >= 4"
+              />
+              <p class="hint">亲历、可核对。</p>
+            </div>
+            <div class="field">
+              <label>现场照片或短视频</label>
+              <div
+                class="upload"
+                :class="{ over: dragging }"
+                @dragover.prevent="onDragOver"
+                @dragleave="dragging = false"
+                @drop.prevent="onDrop"
+              >
+                把照片或短视频拖到这里，或
+                <label class="upload-pick">
+                  <input
+                    class="sr-only"
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                    :disabled="jobLocked"
+                    @change="onFiles"
+                  />
+                  选择照片或短视频
+                </label>
+              </div>
+              <p class="err" v-if="uploadErr">{{ uploadErr }}</p>
+              <div class="thumbs">
+                <div class="card-asset" v-for="as in article.assets" :key="as.id">
+                  <img v-if="as.kind === 'image'" :src="as.url" alt="" />
+                  <div v-else class="ph">短视频</div>
+                  <p class="hint">{{ as.analysis?.caption }}</p>
+                  <t-button size="small" theme="primary" variant="outline" :disabled="jobLocked" @click="confirmAsset(as.id)">写进事实</t-button>
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label>选题</label>
               <div class="chips">
                 <button v-for="o in options.form" :key="o.code" type="button" class="chip" :class="{ on: article.formCode === o.code }" :aria-pressed="article.formCode === o.code" :disabled="jobLocked" @click="article.formCode = o.code">{{ o.labelZh }}</button>
               </div>
-            </div>
-            <div class="field">
-              <label>创作意图</label>
               <div class="chips">
                 <button v-for="o in options.intent" :key="o.code" type="button" class="chip" :class="{ on: article.intentCode === o.code }" :aria-pressed="article.intentCode === o.code" :disabled="jobLocked" @click="article.intentCode = o.code">{{ o.labelZh }}</button>
               </div>
-            </div>
-            <div class="field">
-              <label>内容类目</label>
               <div class="chips">
                 <button v-for="o in options.topicL1" :key="o.code" type="button" class="chip" :class="{ on: article.topicCodes?.includes(o.code) }" :aria-pressed="article.topicCodes?.includes(o.code)" :disabled="jobLocked" @click="toggleTopic(o.code)">{{ o.labelZh }}</button>
+                <button type="button" class="text-btn" :aria-expanded="moreTopics" :disabled="jobLocked" @click="moreTopics = !moreTopics">{{ moreTopics ? "收起类目" : "更多类目" }}</button>
               </div>
-              <p class="hint">
-                <button type="button" class="chip" :class="{ on: moreTopics }" :aria-expanded="moreTopics" :disabled="jobLocked" @click="moreTopics = !moreTopics">更多类目</button>
-              </p>
               <div class="chips" v-if="moreTopics">
                 <button v-for="o in options.topicMore" :key="o.code" type="button" class="chip" :class="{ on: article.topicCodes?.includes(o.code) }" :aria-pressed="article.topicCodes?.includes(o.code)" :disabled="jobLocked" @click="toggleTopic(o.code)">{{ o.labelZh }}</button>
               </div>
             </div>
-            <div class="field">
-              <label>作品主题</label>
-              <t-input v-model="article.theme" placeholder="例如：我把店里那根闪了两周的灯管换了" :disabled="jobLocked" />
-            </div>
-            <div class="field" v-for="(a, i) in article.anchors" :key="a.id">
-              <label>事实依据 {{ i + 1 }}（亲历、可核对）</label>
-              <t-textarea v-model="a.text" :autosize="{ minRows: 2 }" placeholder="请填写你亲历且可核对的具体事实" :disabled="jobLocked" @change="a.confirmed = a.text.trim().length >= 4" />
-            </div>
-            <p class="hint">风格默认系统，可不改。</p>
-            <div class="chips" v-if="styles.length">
-              <button
-                v-for="s in styles"
-                :key="s.code"
-                type="button"
-                class="chip"
-                :class="{ on: (article.styleCode || 'system') === s.code }"
-                :aria-pressed="(article.styleCode || 'system') === s.code"
-                :disabled="jobLocked"
-                @click="article.styleCode = s.code"
-              >{{ s.labelZh }}</button>
-            </div>
-            <div
-              class="upload"
-              :class="{ over: dragging }"
-              @dragover.prevent="onDragOver"
-              @dragleave="dragging = false"
-              @drop.prevent="onDrop"
-            >
-              把现场照片或短视频拖到这里，或
-              <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4" :disabled="jobLocked" @change="onFiles" />
-            </div>
-            <div class="thumbs">
-              <div class="card-asset" v-for="as in article.assets" :key="as.id">
-                <img v-if="as.kind === 'image'" :src="as.url" alt="" />
-                <div v-else class="ph">短视频</div>
-                <p class="hint">{{ as.analysis?.caption }}</p>
-                <t-button size="small" theme="primary" variant="outline" :disabled="jobLocked" @click="confirmAsset(as.id)">用作事实依据</t-button>
+            <p>
+              <button type="button" class="text-btn" :aria-expanded="moreOptions" :disabled="jobLocked" @click="moreOptions = !moreOptions">{{ moreOptions ? "收起选项" : "更多选项" }}</button>
+            </p>
+            <div class="field" v-if="moreOptions">
+              <label>风格</label>
+              <p class="hint">默认系统，可不改。</p>
+              <div class="chips" v-if="styles.length">
+                <button
+                  v-for="s in styles"
+                  :key="s.code"
+                  type="button"
+                  class="chip"
+                  :class="{ on: (article.styleCode || 'system') === s.code }"
+                  :aria-pressed="(article.styleCode || 'system') === s.code"
+                  :disabled="jobLocked"
+                  @click="article.styleCode = s.code"
+                >{{ s.labelZh }}</button>
               </div>
             </div>
-            <p class="err" v-if="gateReason">{{ gateReason }}</p>
-            <p class="err" v-if="uploadErr">{{ uploadErr }}</p>
-            <p class="err" v-if="runErr">{{ runErr }}</p>
           </section>
 
           <section v-else-if="phaseId === 'draft' && article.status === 'draft'">
-            <p class="hint">先在取材里确认主题和两条事实依据，再点生成成稿。</p>
+            <p class="hint">先在取材里确认主题和两条事实，再点生成成稿。</p>
           </section>
 
           <section v-else-if="node === 'outline'">
-            <label>大纲{{ jobLocked ? "（生成中，不能改）" : "（可改；再生成会整条重跑）" }}</label>
+            <label>大纲</label>
+            <p class="hint">{{ jobLocked ? "生成中，不能改。" : "可改；再生成会整条重跑。" }}</p>
             <t-textarea v-model="article.outline" :autosize="{ minRows: 16 }" :disabled="jobLocked" />
           </section>
 
           <section v-else-if="node === 'body'">
-            <label>长文{{ jobLocked ? "（生成中，不能改）" : "（可改）" }}</label>
+            <label>长文</label>
+            <p class="hint">{{ jobLocked ? "生成中，不能改。" : "可改。空行分段。从网页粘贴时会去掉标签。右侧是公众号里读者看到的样子。" }}</p>
             <PaperEditor v-model="bodyPlain" :original-html="article.bodyLong" :locked="jobLocked" />
-            <p class="hint">空行分段。从网页粘贴时会去掉标签。右侧是公众号里读者看到的样子。</p>
           </section>
 
           <section v-else-if="node === 'adapt'">
             <label>笔记文案</label>
             <t-textarea v-model="article.bodyNote" :autosize="{ minRows: 8 }" :disabled="jobLocked" />
-            <p class="hint">请按此顺序在小红书后台上传图片。本产品不代为发表。可上移或移除某张。</p>
+            <p class="hint">请按此顺序在小红书后台上传图片。本产品不代为发表。可上移或拿掉某张。</p>
             <div class="thumbs">
               <div class="card-asset" v-for="(as, i) in imageAssets" :key="as.id">
                 <img :src="as.url" alt="" />
@@ -140,11 +157,12 @@
           </section>
 
           <section v-else-if="phaseId === 'copy'">
+            <p>可以复制到各站后台了。</p>
             <div class="check-item" v-for="(c, i) in report" :key="i">
               {{ c.level === "high" ? "高风险" : c.level === "warn" ? "注意" : "说明" }} · {{ c.text }}
             </div>
             <p class="notice">{{ copyNotice }}</p>
-            <p class="hint">公众号会过滤外链图片。请先粘贴文字，再按渠道适配中的顺序在后台上传图片。</p>
+            <p class="hint">公众号会过滤外链图片。请先粘贴文字，再按渠道适配中的顺序在后台上传图片。用底栏复制。</p>
             <p class="err" v-if="copyErr">{{ copyErr }}</p>
           </section>
         </div>
@@ -169,6 +187,7 @@
       </aside>
     </div>
     <footer class="studio-dock">
+      <p class="dock-reason" v-if="dockReason">{{ dockReason }}</p>
       <template v-if="phaseId === 'fill'">
         <t-button theme="primary" :disabled="!!gateReason || jobLocked" :loading="jobLocked || running" @click="run">{{ article.status === 'ready' ? '再生成成稿' : '生成成稿' }}</t-button>
       </template>
@@ -180,7 +199,7 @@
         <t-button theme="primary" :disabled="article.status !== 'ready'" @click="setPhase('copy')">去取稿</t-button>
       </template>
       <template v-else>
-        <t-button variant="outline" :disabled="!canCopyNow" @click="copyText">只复制长文</t-button>
+        <t-button variant="outline" :disabled="!canCopyNow" @click="copyText">复制长文</t-button>
         <t-button variant="outline" :disabled="!canCopyNow" @click="copyOpen('note')">复制笔记并打开小红书</t-button>
         <t-button theme="primary" :disabled="!canCopyNow" @click="copyOpen('long')">复制长文并打开公众号</t-button>
       </template>
@@ -254,6 +273,7 @@ const node = ref<NodeId>("topic");
 const preview = ref<"mp" | "note">("note");
 const bodyPlain = ref("");
 const moreTopics = ref(false);
+const moreOptions = ref(false);
 const copyErr = ref("");
 const uploadErr = ref("");
 const runErr = ref("");
@@ -294,6 +314,17 @@ const gateReason = computed(() => {
       topicCodes: a.topicCodes,
     }).reason ?? ""
   );
+});
+
+const dockReason = computed(() => {
+  if (jobLocked.value) return "";
+  if (runErr.value) return runErr.value;
+  if (phaseId.value === "fill" && gateReason.value) return gateReason.value;
+  if (phaseId.value === "draft") {
+    if (article.value?.status !== "ready") return "成稿完成后可取";
+    if (gateReason.value) return gateReason.value;
+  }
+  return "";
 });
 
 const report = computed(() => article.value?.checkReport ?? []);
@@ -377,6 +408,11 @@ async function openArticle() {
   await load();
 }
 
+function goCopy() {
+  node.value = "copy";
+  preview.value = "note";
+}
+
 async function load() {
   if (!route.params.id) return;
   const seq = ++loadSeq;
@@ -387,6 +423,7 @@ async function load() {
   bodyPlain.value = htmlToPlain(article.value?.bodyLong || "");
   const selectedMore = (article.value?.topicCodes || []).some((c) => options.value.topicMore.some((o) => o.code === c));
   moreTopics.value = selectedMore;
+  moreOptions.value = (article.value?.styleCode || "system") !== "system";
   if (article.value?.status === "generating") {
     const cur = article.value.currentNode;
     node.value = isNode(cur) && (phases[1].nodes as string[]).includes(cur) ? cur : "outline";
@@ -396,8 +433,7 @@ async function load() {
   }
   stopPoll();
   if (prev === "generating" && article.value?.status === "ready") {
-    node.value = "outline";
-    preview.value = "mp";
+    goCopy();
     return;
   }
   if (prev === "generating" && article.value?.status === "failed") {
@@ -497,6 +533,10 @@ async function run() {
     if (!article.value) return;
     article.value = await api(`/api/articles/${article.value.id}/generate`, { method: "POST" });
     bodyPlain.value = htmlToPlain(article.value.bodyLong || "");
+    if (article.value.status === "ready") {
+      goCopy();
+      return;
+    }
     node.value = "outline";
     preview.value = "mp";
     if (article.value.status === "generating") startPoll();
@@ -532,9 +572,11 @@ async function uploadList(files: FileList | File[]) {
 }
 
 async function onFiles(ev: Event) {
-  const files = (ev.target as HTMLInputElement).files;
+  const input = ev.target as HTMLInputElement;
+  const files = input.files;
   if (!files?.length) return;
   await uploadList(files);
+  input.value = "";
 }
 
 function onDragOver() {

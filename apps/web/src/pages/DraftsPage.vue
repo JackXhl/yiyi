@@ -26,14 +26,14 @@
       <t-button theme="primary" @click="create">新建作品</t-button>
     </div>
     <div class="empty" v-else-if="!visible.length">
-      <p>暂无作品</p>
+      <p>{{ filter === "ready" ? "没有已成稿" : "没有草稿" }}</p>
     </div>
     <div class="draft-grid" v-else>
       <button class="draft-card" v-for="a in visible" :key="a.id" type="button" @click="$router.push(`/write/${a.id}`)">
         <img v-if="a.cover" class="cover" :src="a.cover" alt="" />
         <span v-else class="ph cover-empty" />
         <div class="info">
-          <div class="ttl">{{ a.title || "未命名作品" }}</div>
+          <div class="ttl">{{ a.title || "未命名" }}</div>
           <div class="meta">
             <span>{{ statusLabel(a.status) }}</span>
             <span>{{ format(a.updatedAt) }}</span>

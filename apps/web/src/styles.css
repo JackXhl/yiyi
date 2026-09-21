@@ -591,6 +591,13 @@ button:focus-visible, a:focus-visible {
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+.dock-reason {
+  margin: 0 auto 0 0;
+  color: #fa5151;
+  font-size: 14px;
+  flex: 1 1 160px;
 }
 
 .steps { display: none; }
@@ -610,6 +617,29 @@ button:focus-visible, a:focus-visible {
   border-color: var(--yy-green);
   background: var(--yy-green-soft);
   color: #059a4c;
+}
+.text-btn {
+  border: 0;
+  background: none;
+  padding: 6px 4px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--yy-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.text-btn:hover:not(:disabled) { color: var(--yy-text); }
+.text-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .field { margin-bottom: 16px; }
@@ -636,6 +666,15 @@ button:focus-visible, a:focus-visible {
 .upload.over {
   border-color: var(--yy-green);
   background: var(--yy-green-soft);
+}
+.upload-pick {
+  color: var(--yy-text);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.upload-pick:has(.sr-only:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .thumbs { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 .card-asset {

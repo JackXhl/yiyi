@@ -5,7 +5,7 @@
       <p style="margin: 0 0 8px">{{ me?.email }}</p>
       <p style="margin: 0" class="hint">
         {{ me?.planName }} · 剩余 {{ me?.quotaLeft }} / {{ me?.quota }} 篇
-        · 到期 {{ me?.subExpiresAt ? new Date(me.subExpiresAt).toLocaleString("zh-CN") : "—" }}
+        · 到期 {{ expiresDate }}
       </p>
       <p v-if="!me?.subActive" class="err">订阅已到期，仅可查看已有作品。</p>
     </div>
@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { api } from "../api";
 import { useAuth } from "../stores/auth";
@@ -49,6 +49,14 @@ const buying = ref("");
 const router = useRouter();
 const auth = useAuth();
 const flight = new InFlight();
+const expiresDate = computed(() => {
+  if (!me.value?.subExpiresAt) return "—";
+  return new Date(me.value.subExpiresAt).toLocaleDateString("zh-CN", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+});
 
 onMounted(async () => {
   me.value = await api("/api/me");
